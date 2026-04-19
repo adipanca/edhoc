@@ -1,0 +1,184 @@
+buatkan saya benchmark p2p dimana initiator menggunakan raspberry pi dan responder dari server untuk benchmark varian berikut : 
+1. type 0 classic
+2. type 0 PQ
+3. type 3 classic
+4. type 3 PQ
+5. type 3 Hybrid
+
+dengan menggunakan  code dengan algorithm yang saya pilih dari library berikut : 
+
+1. jika algorithm X25519 gunakan library LIBSODIUM
+2. jika algorithm ML-KEM-768 gunakan library PQCLEAN
+3. jika algorithm Ed25519 untuk sign dan verification gunakan library LIBSODIUM
+4. jika algorithm ML-DSA-65 gunakan library PQCLEAN
+5. jika algorithm AEAD gunakan AES GCM dari library MBEDTLS
+6. jika SHA-256 gunakan library LIBSODIUM
+7. jika HKDF gunakan library LIBSODIUM
+
+sehingga hasil benchmark fair dan konsisten satu sama lain.
+
+PASTIKAN SETUP MAKEFILE PQCLEAN DENGAN -O0 agar lebih lambat
+
+kemudian hasil benchmark menjadi beberapa file .csv berikut : 
+
+1. benchmark_crypto_initiator.csv 
+contoh isian file :
+algorithm,operation,avg_us,stddev_us,min_us,max_us,median_us,iterations,key_length
+X25519,Keygen, 0, 0, 0, 0, 0, 0,0
+ML-KEM-768,Keygen, 0, 0, 0, 0, 0, 0,0
+X25519+MLKEM-768,Keygen, 0, 0, 0, 0, 0, 0,0
+X25519,Scalar multiplication , 0, 0, 0, 0, 0, 0,0
+ML-KEM-768,Encaps, 0, 0, 0, 0, 0, 0,0
+ML-KEM-768,Decaps, 0, 0, 0, 0, 0, 0,0
+X25519+MLKEM-768,Encaps, 0, 0, 0, 0, 0, 0,0
+X25519+MLKEM-768,Decaps, 0, 0, 0, 0, 0, 0,0
+Ed25519,Signature, 0, 0, 0, 0, 0, 0,0
+Ed25519,Verify, 0, 0, 0, 0, 0, 0,0
+
+2. benchmark_crypto_responder.csv
+contoh isian file :
+algorithm,operation,avg_us,stddev_us,min_us,max_us,median_us,iterations,key_length
+X25519,Keygen, 0, 0, 0, 0, 0, 0,0
+ML-KEM-768,Keygen, 0, 0, 0, 0, 0, 0,0
+X25519+MLKEM-768,Keygen, 0, 0, 0, 0, 0, 0,0
+X25519,Scalar multiplication , 0, 0, 0, 0, 0, 0,0
+ML-KEM-768,Encaps, 0, 0, 0, 0, 0, 0,0
+ML-KEM-768,Decaps, 0, 0, 0, 0, 0, 0,0
+X25519+MLKEM-768,Encaps, 0, 0, 0, 0, 0, 0,0
+X25519+MLKEM-768,Decaps, 0, 0, 0, 0, 0, 0,0
+Ed25519,Signature, 0, 0, 0, 0, 0, 0,0
+Ed25519,Verify, 0, 0, 0, 0, 0, 0,0
+
+3. benchmark_fullhandshake_operation_p2p_initiator.csv
+contoh isian file :
+type,role,operation,avg_time_us,calls_per_handshake,total_per_handshake_us,iterations
+Type0_classic,Initiator,KeyGen,0,0,0,0
+Type0_classic,Initiator,Scalar multiplication,0,0,0,0
+Type0_classic,Initiator,HKDF-EXTRACT,0,0,0,0
+Type0_classic,Initiator,HKDF-EXPANDS,0,0,0,0
+Type0_classic,Initiator,HASH,0,0,0,0
+Type0_classic,Initiator,AEAD_ENCRYPT,0,0,0,0
+Type0_classic,Initiator,AEAD_DECRYPT,0,0,0,0
+Type0_classic,Initiator,Signature,0,0,0,0
+Type0_classic,Initiator,Verify,0,0,0,0
+
+Type0_PQ,Initiator,KeyGen,0,0,0,0
+Type0_PQ,Initiator,Encaps,0,0,0,0
+Type0_PQ,Initiator,Decaps,0,0,0,0
+Type0_PQ,Initiator,HKDF-EXTRACT,0,0,0,0
+Type0_PQ,Initiator,HKDF-EXPANDS,0,0,0,0
+Type0_PQ,Initiator,HASH,0,0,0,0
+Type0_PQ,Initiator,AEAD_ENCRYPT,0,0,0,0
+Type0_PQ,Initiator,AEAD_DECRYPT,0,0,0,0
+Type0_PQ,Initiator,Signature,0,0,0,0
+Type0_PQ,Initiator,Verify,0,0,0,0
+
+Type3_Classic,Initiator,KeyGen,0,0,0,0
+Type3_Classic,Initiator,Scalar multiplication,0,0,0,0
+Type3_Classic,Initiator,HKDF-EXTRACT,0,0,0,0
+Type3_Classic,Initiator,HKDF-EXPANDS,0,0,0,0
+Type3_Classic,Initiator,HASH,0,0,0,0
+Type3_Classic,Initiator,AEAD_ENCRYPT,0,0,0,0
+Type3_Classic,Initiator,AEAD_DECRYPT,0,0,0,0
+
+Type3_PQ,Initiator,KeyGen,0,0,0,0
+Type3_PQ,Initiator,Encaps,0,0,0,0
+Type3_PQ,Initiator,Decaps,0,0,0,0
+Type3_PQ,Initiator,HKDF-EXTRACT,0,0,0,0
+Type3_PQ,Initiator,HKDF-EXPANDS,0,0,0,0
+Type3_PQ,Initiator,HASH,0,0,0,0
+Type3_PQ,Initiator,AEAD_ENCRYPT,0,0,0,0
+Type3_PQ,Initiator,AEAD_DECRYPT,0,0,0,0
+
+Type3_Hybrid,Initiator,KeyGen,0,0,0,0
+Type3_Hybrid,Initiator,Encaps,0,0,0,0
+Type3_Hybrid,Initiator,Decaps,0,0,0,0
+Type3_Hybrid,Initiator,HKDF-EXTRACT,0,0,0,0
+Type3_Hybrid,Initiator,HKDF-EXPANDS,0,0,0,0
+Type3_Hybrid,Initiator,HASH,0,0,0,0
+Type3_Hybrid,Initiator,AEAD_ENCRYPT,0,0,0,0
+Type3_Hybrid,Initiator,AEAD_DECRYPT,0,0,0,0
+
+4. benchmark_fullhandshake_operation_p2p_responder.csv
+contoh isian file :
+type,role,operation,avg_time_us,calls_per_handshake,total_per_handshake_us,iterations
+Type0_classic,Responder,KeyGen,0,0,0,0
+Type0_classic,Responder,Scalar multiplication,0,0,0,0
+Type0_classic,Responder,HKDF-EXTRACT,0,0,0,0
+Type0_classic,Responder,HKDF-EXPANDS,0,0,0,0
+Type0_classic,Responder,HASH,0,0,0,0
+Type0_classic,Responder,AEAD_ENCRYPT,0,0,0,0
+Type0_classic,Responder,AEAD_DECRYPT,0,0,0,0
+Type0_classic,Responder,Signature,0,0,0,0
+Type0_classic,Responder,Verify,0,0,0,0
+
+Type0_PQ,Responder,KeyGen,0,0,0,0
+Type0_PQ,Responder,Encaps,0,0,0,0
+Type0_PQ,Responder,Decaps,0,0,0,0
+Type0_PQ,Responder,HKDF-EXTRACT,0,0,0,0
+Type0_PQ,Responder,HKDF-EXPANDS,0,0,0,0
+Type0_PQ,Responder,HASH,0,0,0,0
+Type0_PQ,Responder,AEAD_ENCRYPT,0,0,0,0
+Type0_PQ,Responder,AEAD_DECRYPT,0,0,0,0
+Type0_PQ,Responder,Signature,0,0,0,0
+Type0_PQ,Responder,Verify,0,0,0,0
+
+Type3_Classic,Responder,KeyGen,0,0,0,0
+Type3_Classic,Responder,Scalar multiplication,0,0,0,0
+Type3_Classic,Responder,HKDF-EXTRACT,0,0,0,0
+Type3_Classic,Responder,HKDF-EXPANDS,0,0,0,0
+Type3_Classic,Responder,HASH,0,0,0,0
+Type3_Classic,Responder,AEAD_ENCRYPT,0,0,0,0
+Type3_Classic,Responder,AEAD_DECRYPT,0,0,0,0
+
+Type3_PQ,Responder,KeyGen,0,0,0,0
+Type3_PQ,Responder,Encaps,0,0,0,0
+Type3_PQ,Responder,Decaps,0,0,0,0
+Type3_PQ,Responder,HKDF-EXTRACT,0,0,0,0
+Type3_PQ,Responder,HKDF-EXPANDS,0,0,0,0
+Type3_PQ,Responder,HASH,0,0,0,0
+Type3_PQ,Responder,AEAD_ENCRYPT,0,0,0,0
+Type3_PQ,Responder,AEAD_DECRYPT,0,0,0,0
+
+Type3_Hybrid,Responder,KeyGen,0,0,0,0
+Type3_Hybrid,Responder,Encaps,0,0,0,0
+Type3_Hybrid,Responder,Decaps,0,0,0,0
+Type3_Hybrid,Responder,HKDF-EXTRACT,0,0,0,0
+Type3_Hybrid,Responder,HKDF-EXPANDS,0,0,0,0
+Type3_Hybrid,Responder,HASH,0,0,0,0
+Type3_Hybrid,Responder,AEAD_ENCRYPT,0,0,0,0
+Type3_Hybrid,Responder,AEAD_DECRYPT,0,0,0,0
+
+5. benchmark_fullhandshake_overhead_p2p_initiator.csv
+type,role,cpu_time_us,cpu_usage_percentage,memory_bytes,memory_us
+Type0_classic,Initiator,0,0,0,0
+Type0_PQ,Initiator,0,0,0,0
+Type3_Classic,Initiator,0,0,0,0 
+Type3_PQ,Initiator,0,0,0,0
+Type3_Hybrid,Initiator,0,0,0,0
+
+6. benchmark_fullhandshake_overhead_p2p_responder.csv
+type,role,cpu_time_us,cpu_usage_percentage,memory_bytes,memory_us
+Type0_classic,Responder,0,0,0,0
+Type0_PQ,Responder,0,0,0,0
+Type3_Classic,Responder,0,0,0,0 
+Type3_PQ,Responder,0,0,0,0
+Type3_Hybrid,Responder,0,0,0,0
+
+7. benchmark_fullhandshake_processing_p2p_initiator.csv
+type,role,processing_us,txrx_us,precomputation_us,overhead_us,total_us
+Type0_classic,Initiator,0,0,0,0,0
+Type0_PQ,Initiator,0,0,0,0,0
+Type3_Classic,Initiator,0,0,0,0,0 
+Type3_PQ,Initiator,0,0,0,0,0
+Type3_Hybrid,Initiator,0,0,0,0,0
+
+
+8. benchmark_fullhandshake_processing_p2p_responder.csv
+type,role,processing_us,txrx_us,precomputation_us,overhead_us,total_us
+Type0_classic,Responder,0,0,0,0,0
+Type0_PQ,Responder,0,0,0,0,0
+Type3_Classic,Responder,0,0,0,0,0 
+Type3_PQ,Responder,0,0,0,0,0
+Type3_Hybrid,Responder,0,0,0,0,0
+
