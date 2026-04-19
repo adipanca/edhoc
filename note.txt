@@ -182,3 +182,8 @@ Type3_Classic,Responder,0,0,0,0,0
 Type3_PQ,Responder,0,0,0,0,0
 Type3_Hybrid,Responder,0,0,0,0,0
 
+selanjutnya kita sudah berada di branch eap, dan saya ingin melakukan benchmark menggunakan eap, seluruh protocol tetap menggunakan alur dan proses yang sama seperti saat ini, namun bedanya kita wrap dan bungkus dengan EAP sesuai dengan RFC EAP EDHOC (draft-ietf-emu-eap-edhoc) :
+Poin penting yang perlu dipastikan saat implementasi:
+Fragmentasi: EAP memiliki batasan MTU. Jika pesan EDHOC kamu besar (misal karena sertifikat, PQC atau Hybrid), pastikan mekanisme fragmentasi EAP-EDHOC sudah ditangani.
+EAP Method Type: Pastikan kode kamu menggunakan Method Type yang sesuai untuk EAP-EDHOC (saat ini masih dalam tahap alokasi IANA, biasanya menggunakan nilai eksperimental jika belum final).
+MSK/EMSK: Jangan lupa bahwa setelah proses selesai, EAP harus menurunkan Master Session Key untuk digunakan oleh layer bawah (seperti 802.11 atau 802.15.4). jika sudah berhasil build, run dan tambahkan pada direktori docs/handshake_mermaid_eap.md
