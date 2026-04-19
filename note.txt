@@ -187,3 +187,4 @@ Poin penting yang perlu dipastikan saat implementasi:
 Fragmentasi: EAP memiliki batasan MTU. Jika pesan EDHOC kamu besar (misal karena sertifikat, PQC atau Hybrid), pastikan mekanisme fragmentasi EAP-EDHOC sudah ditangani.
 EAP Method Type: Pastikan kode kamu menggunakan Method Type yang sesuai untuk EAP-EDHOC (saat ini masih dalam tahap alokasi IANA, biasanya menggunakan nilai eksperimental jika belum final).
 MSK/EMSK: Jangan lupa bahwa setelah proses selesai, EAP harus menurunkan Master Session Key untuk digunakan oleh layer bawah (seperti 802.11 atau 802.15.4). jika sudah berhasil build, run dan tambahkan pada direktori docs/handshake_mermaid_eap.md
+
