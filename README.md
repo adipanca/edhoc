@@ -76,7 +76,18 @@ Komponen yang digunakan:
 
 ## Build
 
-Build benchmark P2P:
+### Build Semua (P2P + EAP + Unified)
+
+```bash
+make clean && make -j$(nproc)
+```
+
+Menghasilkan 6 binary:
+- `build/p2p_initiator` / `build/p2p_responder` — P2P saja
+- `build/eap_initiator` / `build/eap_responder` — EAP saja
+- `build/initiator` / `build/responder` — Unified (P2P + EAP dalam 1 run)
+
+### Build P2P Saja
 
 ```bash
 make -f Makefile.p2p_bench
@@ -138,7 +149,7 @@ Hasil validasi terakhir (ringkas):
 - Semua 5 varian berhasil dijalankan end-to-end (initiator & responder)
 - CSV berhasil ditulis lengkap (8 file)
 
-## Output CSV
+## Output CSV (P2P)
 
 Berikut 8 file output yang dihasilkan:
 
@@ -167,6 +178,7 @@ edhoc/
 ├── Makefile.crypto_bench
 ├── Makefile.p2p_bench
 ├── Makefile.eap_bench          ← EAP-EDHOC benchmark build
+├── Makefile.unified_bench      ← Unified (P2P+EAP) benchmark build
 ├── README.md
 ├── note.txt
 ├── include/
@@ -199,6 +211,8 @@ edhoc/
 │   ├── variant_type3_classic.c
 │   ├── variant_type3_pq.c
 │   ├── variant_type3_hybrid.c
+│   ├── benchmark_unified_initiator.c  ← Unified initiator (P2P+EAP)
+│   ├── benchmark_unified_responder.c  ← Unified responder (P2P+EAP)
 │   ├── pqclean_kem.c
 │   ├── pqclean_sig.c
 │   ├── crypto_libsodium.c
@@ -335,8 +349,9 @@ Run ulang:
 ```
 
 Catatan:
-- `make` di root saat ini default membangun P2P.
-- Untuk EAP, gunakan `make -f Makefile.eap_bench ...` atau `make eap`.
+- `make` di root membangun P2P + EAP + Unified sekaligus.
+- Untuk build terpisah: `make p2p`, `make eap`, atau `make unified`.
+- Untuk EAP saja: `make -f Makefile.eap_bench`.
 
 ### Output CSV EAP-EDHOC
 
@@ -381,3 +396,80 @@ mengalahkan X25519+HMAC karena overhead per-round-trip mendominasi pada pesan ke
 
 Lihat `docs/handshake_mermaid_eap.md` untuk diagram lengkap semua 5 varian
 termasuk detail fragmentasi EAP dan derivasi MSK/EMSK.
+
+---
+
+## Unified Benchmark (P2P + EAP)
+
+Binary unified (`build/initiator` dan `build/responder`) menjalankan **semua benchmark
+(P2P + EAP)** dalam satu kali run melalui satu koneksi TCP.
+
+### Alur Eksekusi Unified
+
+1. **Phase 1** — Benchmark pure crypto (lokal, 17 operasi)
+2. **Phase 2** — P2P full handshake (5 varian × 100 iterasi)
+3. **Phase 3** — EAP-EDHOC full handshake (5 varian × 100 iterasi)
+4. **Phase 4** — Tulis semua CSV (9 file per sisi = 18 total)
+
+Transisi P2P→EAP menggunakan sinyal `0xFE` (phase switch) melalui koneksi TCP yang
+sama. Setelah EAP selesai, sinyal `0xFF` dikirim untuk mengakhiri benchmark.
+
+### Build Unified
+
+```bash
+make unified
+# atau build semua sekaligus:
+make clean && make -j$(nproc)
+```
+
+Output binary:
+- `build/initiator`
+- `build/responder`
+
+### Cara Pakai (Unified)
+
+Jalankan responder dulu:
+
+```bash
+./build/responder [port]
+```
+
+Lalu jalankan initiator:
+
+```bash
+./build/initiator <server_ip> [port]
+```
+
+Contoh run lokal:
+
+```bash
+./build/responder 19500 &
+sleep 1
+./build/initiator 127.0.0.1 19500
+```
+
+### Output CSV Unified
+
+Satu kali run menghasilkan **18 file CSV** (9 per sisi):
+
+| File | Isi |
+|---|---|
+| `benchmark_crypto_initiator.csv` | Micro-benchmark kripto |
+| `benchmark_crypto_eap_initiator.csv` | Micro-benchmark kripto (salinan EAP) |
+| `benchmark_fullhandshake_operation_p2p_initiator.csv` | Per-operasi P2P |
+| `benchmark_fullhandshake_overhead_p2p_initiator.csv` | Memory overhead P2P |
+| `benchmark_fullhandshake_processing_p2p_initiator.csv` | Processing/txrx P2P |
+| `benchmark_fullhandshake_operation_eap_initiator.csv` | Per-operasi EAP |
+| `benchmark_fullhandshake_overhead_eap_initiator.csv` | Memory overhead EAP |
+| `benchmark_fullhandshake_processing_eap_initiator.csv` | Processing/txrx EAP |
+| `benchmark_eap_transport_initiator.csv` | EAP transport stats |
+
+(Sama untuk `_responder` — total 18 file.)
+
+### Ringkasan Mode Run
+
+| Mode | Responder | Initiator | CSV |
+|------|-----------|-----------|-----|
+| P2P saja | `./build/p2p_responder 19500` | `./build/p2p_initiator <ip> 19500` | 8 file |
+| EAP saja | `./build/eap_responder 9877` | `./build/eap_initiator <ip> 9877` | 10 file |
+| **Unified (ALL)** | `./build/responder 19500` | `./build/initiator <ip> 19500` | **18 file** |

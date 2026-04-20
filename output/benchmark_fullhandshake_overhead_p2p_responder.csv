@@ -1,6 +1,6 @@
 type,role,cpu_time_us,cpu_usage_percentage,memory_bytes,memory_us
-Type0_classic,Responder,617.91,5.53,23000,2.48
-Type0_PQ,Responder,10558.20,27.20,173872,4.86
-Type3_Classic,Responder,753.68,6.62,21880,2.50
-Type3_PQ,Responder,3314.27,16.53,92384,5.35
-Type3_Hybrid,Responder,1785.96,9.31,68496,3.48
+Type0_classic,Responder,104.88,38.30,23000,0.57
+Type0_PQ,Responder,2085.98,46.82,173872,1.28
+Type3_Classic,Responder,104.54,38.93,21880,0.50
+Type3_PQ,Responder,480.85,40.54,92384,0.68
+Type3_Hybrid,Responder,256.31,35.13,68496,0.52
