@@ -166,10 +166,12 @@ edhoc/
 ├── Makefile
 ├── Makefile.crypto_bench
 ├── Makefile.p2p_bench
+├── Makefile.eap_bench          ← EAP-EDHOC benchmark build
 ├── README.md
 ├── note.txt
 ├── include/
 │   ├── edhoc_benchmark_p2p.h
+│   ├── edhoc_benchmark_eap.h   ← EAP-EDHOC constants & function declarations
 │   ├── edhoc_pq_kem.h
 │   ├── edhoc_common.h
 │   ├── edhoc_type0_classic.h
@@ -182,6 +184,14 @@ edhoc/
 │   ├── benchmark_p2p_common.c
 │   ├── benchmark_p2p_initiator.c
 │   ├── benchmark_p2p_responder.c
+│   ├── benchmark_eap_initiator.c   ← EAP Peer benchmark main
+│   ├── benchmark_eap_responder.c   ← EAP Server benchmark main
+│   ├── eap_layer.c                 ← EAP framing, fragmentation, MSK/EMSK
+│   ├── eap_variant_type0_classic.c ← EAP-EDHOC Type 0 Classic
+│   ├── eap_variant_type0_pq.c      ← EAP-EDHOC Type 0 PQ
+│   ├── eap_variant_type3_classic.c ← EAP-EDHOC Type 3 Classic
+│   ├── eap_variant_type3_pq.c      ← EAP-EDHOC Type 3 PQ (4-msg)
+│   ├── eap_variant_type3_hybrid.c  ← EAP-EDHOC Type 3 Hybrid
 │   ├── edhoc_pq_kem.c
 │   ├── edhoc_common.c
 │   ├── variant_type0_classic.c
@@ -193,6 +203,9 @@ edhoc/
 │   ├── pqclean_sig.c
 │   ├── crypto_libsodium.c
 │   └── main.c
+├── docs/
+│   ├── handshake_mermaid.md        ← P2P handshake diagrams
+│   └── handshake_mermaid_eap.md    ← EAP-EDHOC handshake diagrams
 ├── lib/
 │   ├── PQClean/
 │   ├── uoscore-uedhoc/
@@ -212,11 +225,8 @@ edhoc/
 
 ## Referensi Flow Handshake
 
-- Diagram Mermaid terbaru untuk semua varian ada di `docs/handshake_mermaid.md`
-- Section yang sudah diupdate sesuai implementasi terbaru:
-  - Type 0 Classic (3-message sig-sig, Ed25519 + X25519)
-  - Type 0 PQ (3-message sig-sig, ML-DSA-65 + ML-KEM-768)
-  - Type 3 PQ (4-message mac-mac, encrypted MSG1)
+- Diagram Mermaid untuk semua varian P2P ada di `docs/handshake_mermaid.md`
+- Diagram Mermaid untuk semua varian EAP-EDHOC ada di `docs/handshake_mermaid_eap.md`
 
 ## Perbandingan Autentikasi Varian
 
@@ -227,3 +237,108 @@ edhoc/
 | Type 3 Classic | mac-mac | X25519 static DH | — | — | 3 |
 | Type 3 PQ | mac-mac | ML-KEM-768 (×3) | — | — | 4 |
 | Type 3 Hybrid | mac-mac | X25519 + ML-KEM-768 | — | — | 3 |
+
+---
+
+## EAP-EDHOC Benchmark
+
+Branch `eapedhoc` menambahkan wrapping **EAP-EDHOC** di atas semua 5 varian sesuai
+[draft-ietf-emu-eap-edhoc]. Skenario ini mensimulasikan penggunaan EDHOC sebagai
+EAP method untuk autentikasi jaringan (802.1X / RADIUS).
+
+### Protokol EAP-EDHOC
+
+- **EAP Method Type:** `0xFE` (254, Experimental)
+- **Transport:** TCP dengan 2-byte length prefix per EAP packet
+- **EAP MTU:** 1000 bytes/fragment; fragmen dikelola otomatis dengan flag L/M/S
+- **Port default:** `9877`
+- **MSK/EMSK:** 64 byte masing-masing, diderivasi dari `PRK_out` setelah handshake sukses
+
+```
+MSK  = EDHOC-Expand(PRK_out, "EAP-EDHOC MSK",  13, 64)
+EMSK = EDHOC-Expand(PRK_out, "EAP-EDHOC EMSK", 14, 64)
+```
+
+### Build EAP-EDHOC
+
+```bash
+make -f Makefile.eap_bench
+```
+
+Target lain:
+
+```bash
+make -f Makefile.eap_bench initiator    # EAP Peer saja
+make -f Makefile.eap_bench responder    # EAP Server saja
+make -f Makefile.eap_bench clean        # Bersihkan objek EAP
+```
+
+Output binary:
+- `build/eap_initiator`  — EAP Peer (Supplicant)
+- `build/eap_responder`  — EAP Server (Authenticator)
+
+### Cara Pakai (EAP-EDHOC)
+
+Jalankan EAP Server dulu:
+
+```bash
+./build/eap_responder [port]
+```
+
+Lalu jalankan EAP Peer:
+
+```bash
+./build/eap_initiator <server_ip> [port]
+```
+
+Contoh run lokal (satu mesin):
+
+```bash
+./build/eap_responder 9877 &
+sleep 1
+./build/eap_initiator 127.0.0.1 9877
+```
+
+### Output CSV EAP-EDHOC
+
+Delapan file CSV ditulis otomatis ke direktori `output/`:
+
+| File | Isi |
+|---|---|
+| `benchmark_crypto_eap_initiator.csv` | Micro-benchmark kripto (EAP Peer) |
+| `benchmark_crypto_eap_responder.csv` | Micro-benchmark kripto (EAP Server) |
+| `benchmark_fullhandshake_operation_eap_initiator.csv` | Rata-rata per operasi per varian |
+| `benchmark_fullhandshake_operation_eap_responder.csv` | Rata-rata per operasi per varian |
+| `benchmark_fullhandshake_overhead_eap_initiator.csv` | Memory overhead per varian |
+| `benchmark_fullhandshake_overhead_eap_responder.csv` | Memory overhead per varian |
+| `benchmark_fullhandshake_processing_eap_initiator.csv` | processing/txrx/total (µs) |
+| `benchmark_fullhandshake_processing_eap_responder.csv` | processing/txrx/total (µs) |
+
+### Hasil Benchmark EAP-EDHOC (loopback, 100 iterasi)
+
+| Rank | Varian | Total (µs) | Processing (µs) | Tx/Rx (µs) |
+|------|--------|-----------|----------------|------------|
+| 1 | Type 0 Classic | 258.92 | 83.56 | 87.41 |
+| 2 | Type 3 Classic | 277.88 | 93.02 | 103.56 |
+| 3 | Type 3 Hybrid | 800.12 | 268.16 | 330.38 |
+| 4 | Type 3 PQ | 1369.88 | 510.19 | 707.03 |
+| 5 | Type 0 PQ | 4326.39 | 1937.36 | 1870.48 |
+
+Catatan: Type 0 Classic dan Type 3 Classic memiliki timing yang sangat dekat (~19 µs
+selisih). Pada loop loopback, Ed25519 libsodium yang sangat optimal dapat sedikit
+mengalahkan X25519+HMAC karena overhead per-round-trip mendominasi pada pesan kecil.
+
+### EAP Round Trips per Varian
+
+| Varian | EDHOC Msgs | Fragment ACKs | Extra Rounds | Total EAP RT |
+|--------|-----------|--------------|--------------|--------------|
+| Type 0 Classic | 3 | 0 | 0 | 3 |
+| Type 3 Classic | 3 | 0 | 0 | 3 |
+| Type 3 Hybrid | 3 | 2 | 0 | 5 |
+| Type 3 PQ | 4 | 4 | 1 (MSG4 ACK) | 10 |
+| Type 0 PQ | 3 | 11 | 0 | 14 |
+
+### Diagram Sequence EAP-EDHOC
+
+Lihat `docs/handshake_mermaid_eap.md` untuk diagram lengkap semua 5 varian
+termasuk detail fragmentasi EAP dan derivasi MSK/EMSK.

@@ -182,9 +182,41 @@ Type3_Classic,Responder,0,0,0,0,0
 Type3_PQ,Responder,0,0,0,0,0
 Type3_Hybrid,Responder,0,0,0,0,0
 
-selanjutnya kita sudah berada di branch eap, dan saya ingin melakukan benchmark menggunakan eap, seluruh protocol tetap menggunakan alur dan proses yang sama seperti saat ini, namun bedanya kita wrap dan bungkus dengan EAP sesuai dengan RFC EAP EDHOC (draft-ietf-emu-eap-edhoc) :
+selanjutnya kita sudah berada di branch eapedhoc, dan saya ingin melakukan benchmark menggunakan eap, seluruh protocol tetap menggunakan alur dan proses yang sama seperti saat ini base on code cukup bungkus dengan eap, namun bedanya kita wrap dan bungkus dengan EAP sesuai dengan RFC EAP EDHOC (draft-ietf-emu-eap-edhoc) :
 Poin penting yang perlu dipastikan saat implementasi:
 Fragmentasi: EAP memiliki batasan MTU. Jika pesan EDHOC kamu besar (misal karena sertifikat, PQC atau Hybrid), pastikan mekanisme fragmentasi EAP-EDHOC sudah ditangani.
 EAP Method Type: Pastikan kode kamu menggunakan Method Type yang sesuai untuk EAP-EDHOC (saat ini masih dalam tahap alokasi IANA, biasanya menggunakan nilai eksperimental jika belum final).
-MSK/EMSK: Jangan lupa bahwa setelah proses selesai, EAP harus menurunkan Master Session Key untuk digunakan oleh layer bawah (seperti 802.11 atau 802.15.4). jika sudah berhasil build, run dan tambahkan pada direktori docs/handshake_mermaid_eap.md
+MSK/EMSK: Jangan lupa bahwa setelah proses selesai, EAP harus menurunkan Master Session Key untuk digunakan oleh layer bawah (seperti 802.11 atau 802.15.4). jika sudah berhasil build, run dan tambahkan pada direktori docs/handshake_mermaid_eap.md kemudian update readme.md setelah itu verifikasi hasil agar urutan dari yang paling cepat hingga paling lambat sesuai dengan urutan benchmark saat ini pada csv file yaitu : 
+Type3_Classic
+Type3_Hybrid
+Type0_classic
+Type3_PQ
+Type0_PQ
 
+dan tambahkan juga pada benchmark adanya perhitungan fragmentasi dan round trip pada setiap varian, sehingga kita bisa tahu secara detail.
+
+
+
+
+
+
+
+
+
+
+
+Hasilnya sudah jelas membuktikan bahwa perbedaan Type0_Classic vs Type3_Classic BUKAN karena fragmentasi:
+
+Kedua varian memiliki jumlah fragment identik (masing-masing 1 per message), 0 fragment ACK, dan 5 EAP round trips yang sama. Bahkan Type3_Classic memiliki payload lebih kecil (35+66+49=150B vs 35+98+81=214B).
+
+Jadi perbedaan ~25µs murni dari perbedaan operasi kriptografi:
+
+Type0_Classic: Ed25519 Sign + Verify (signature-based, verify ~20µs lebih murah)
+Type3_Classic: 3x X25519 scalar multiplication + HMAC (MAC-based, lebih banyak DH operations)
+Sedangkan untuk varian PQ/Hybrid, fragmentasi memang berperan signifikan:
+
+Type3_Hybrid: 5 frags, 2 frag ACKs, 7 EAP RTs → 851µs
+Type3_PQ: 8 frags, 4 frag ACKs, 11 EAP RTs → 1378µs
+Type0_PQ: 11 frags, 8 frag ACKs, 13 EAP RTs → 4398µs
+
+jika memang bukan karena fragmentasi maka seharusnya hasilnya konsisten secara urutan dengan yang p2p non eap, karena kriptografi yang digunakan sama, alur sama, protocol sama, dan yang membedakan hanya eap framework dengan fragmentasi saja, maka seharusnya perbedaan memang terjadi pada waktu tetapi dengan urutan yang sama antara eap dan non eap
