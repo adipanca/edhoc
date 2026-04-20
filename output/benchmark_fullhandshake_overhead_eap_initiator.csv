@@ -1,6 +1,6 @@
 type,role,cpu_time_us,cpu_usage_percentage,memory_bytes,memory_us
-Type0_classic,Initiator,169.90,65.64,35640,74.90
-Type0_PQ,Initiator,2458.37,57.18,144672,436.91
-Type3_Classic,Initiator,171.20,62.97,35576,67.87
-Type3_PQ,Initiator,661.87,48.44,96568,36.16
-Type3_Hybrid,Initiator,467.62,58.64,57544,67.86
+Type0_classic,Initiator,6513.48,52.78,35248,5741.09
+Type0_PQ,Initiator,16685.71,21.93,144120,7785.01
+Type3_Classic,Initiator,8708.59,59.22,35168,7827.10
+Type3_PQ,Initiator,9035.02,16.66,96432,5770.18
+Type3_Hybrid,Initiator,8231.71,29.55,57376,5818.48
