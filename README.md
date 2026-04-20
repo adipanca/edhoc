@@ -279,6 +279,10 @@ Output binary:
 
 ### Cara Pakai (EAP-EDHOC)
 
+Penting:
+- Menjalankan `./build/p2p_responder` dan `./build/p2p_initiator` hanya menjalankan benchmark P2P.
+- Proses EAP tidak ikut jalan otomatis; jalankan binary EAP terpisah (`eap_responder` dan `eap_initiator`).
+
 Jalankan EAP Server dulu:
 
 ```bash
@@ -298,6 +302,41 @@ Contoh run lokal (satu mesin):
 sleep 1
 ./build/eap_initiator 127.0.0.1 9877
 ```
+
+### Troubleshooting EAP Run
+
+Jika muncul error seperti:
+
+```bash
+./build/eap_responder: No such file or directory
+```
+
+atau command exit code `127`, biasanya binary EAP belum dibuild.
+
+Solusi:
+
+```bash
+cd /home/ubuntu/edhoc
+make -f Makefile.eap_bench clean
+make -f Makefile.eap_bench -j$(nproc)
+```
+
+Verifikasi binary EAP sudah ada:
+
+```bash
+ls -1 build/eap_initiator build/eap_responder
+```
+
+Run ulang:
+
+```bash
+./build/eap_responder 19500
+./build/eap_initiator 127.0.0.1 19500
+```
+
+Catatan:
+- `make` di root saat ini default membangun P2P.
+- Untuk EAP, gunakan `make -f Makefile.eap_bench ...` atau `make eap`.
 
 ### Output CSV EAP-EDHOC
 

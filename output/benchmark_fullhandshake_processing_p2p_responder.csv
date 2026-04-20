@@ -1,6 +1,6 @@
 type,role,processing_us,txrx_us,precomputation_us,overhead_us,total_us
-Type0_classic,Responder,84.93,163.36,13.47,0.60,262.36
-Type0_PQ,Responder,1897.96,2312.20,0.00,0.87,4211.03
-Type3_Classic,Responder,92.40,160.96,13.41,0.50,267.27
-Type3_PQ,Responder,500.40,721.10,0.00,0.75,1222.24
-Type3_Hybrid,Responder,266.36,486.77,0.00,0.63,753.76
+Type0_classic,Responder,534.52,10557.38,80.91,2.48,11175.29
+Type0_PQ,Responder,10553.34,28259.74,0.00,4.86,38817.94
+Type3_Classic,Responder,658.50,10624.17,92.68,2.50,11377.85
+Type3_PQ,Responder,3308.92,16736.65,0.00,5.35,20050.92
+Type3_Hybrid,Responder,1782.48,17394.66,0.00,3.48,19180.62
