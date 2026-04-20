@@ -1,6 +1,6 @@
 type,role,processing_us,txrx_us,precomputation_us,overhead_us,total_us
-Type0_classic,Initiator,99.83,172.39,14.45,0.67,287.34
-Type0_PQ,Initiator,2417.50,2503.66,164.31,1.47,5086.94
-Type3_Classic,Initiator,102.99,190.27,12.99,0.55,306.80
-Type3_PQ,Initiator,570.16,632.53,130.36,0.79,1333.83
-Type3_Hybrid,Initiator,293.42,355.43,138.25,0.70,787.80
+Type0_classic,Initiator,85.20,163.90,12.84,0.54,262.48
+Type0_PQ,Initiator,2117.76,1967.29,125.06,0.94,4211.05
+Type3_Classic,Initiator,92.08,162.30,12.47,0.51,267.36
+Type3_PQ,Initiator,520.55,580.90,120.22,0.64,1222.31
+Type3_Hybrid,Initiator,279.48,339.40,134.42,0.57,753.88
