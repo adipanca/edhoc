@@ -1,0 +1,352 @@
+buatkan saya benchmark p2p dimana initiator menggunakan raspberry pi dan responder dari server untuk benchmark varian berikut : 
+1. Section2 Sign-KEM
+2. Section32 Sign-(KEM+Sign)
+3. Section33 (KEM+Sign)-Sign
+4. Section34 (KEM+Sign)-KEM
+5. Section35 (KEM+Sign)-(KEM+Sign)
+
+dengan menggunakan  code dengan algorithm yang saya pilih dari library berikut : 
+
+1. jika algorithm ML-KEM-768 gunakan library PQCLEAN
+2. jika algorithm ML-DSA-65 gunakan library PQCLEAN
+3. jika algorithm AEAD gunakan AES GCM dari library MBEDTLS
+4. jika SHA-256 gunakan library MBEDTLS
+5. jika HKDF gunakan library MBEDTLS
+
+sehingga hasil benchmark fair dan konsisten satu sama lain.
+
+PASTIKAN SETUP MAKEFILE PQCLEAN DENGAN -O0 agar lebih lambat
+
+kemudian hasil benchmark menjadi beberapa file .csv berikut : 
+
+1. benchmark_crypto_initiator.csv 
+contoh isian file :
+algorithm,operation,avg_us,stddev_us,min_us,max_us,median_us,iterations,key_length
+ML-KEM-768,Keygen, 0, 0, 0, 0, 0, 0,0
+ML-KEM-768,Encaps, 0, 0, 0, 0, 0, 0,0
+ML-KEM-768,Decaps, 0, 0, 0, 0, 0, 0,0
+X25519+MLKEM-768,Encaps, 0, 0, 0, 0, 0, 0,0
+X25519+MLKEM-768,Decaps, 0, 0, 0, 0, 0, 0,0
+MLDSA65,Signature, 0, 0, 0, 0, 0, 0,0
+MLDSA65,Verify, 0, 0, 0, 0, 0, 0,0
+
+2. benchmark_crypto_responder.csv
+contoh isian file :
+algorithm,operation,avg_us,stddev_us,min_us,max_us,median_us,iterations,key_length
+ML-KEM-768,Keygen, 0, 0, 0, 0, 0, 0,0
+ML-KEM-768,Encaps, 0, 0, 0, 0, 0, 0,0
+ML-KEM-768,Decaps, 0, 0, 0, 0, 0, 0,0
+X25519+MLKEM-768,Encaps, 0, 0, 0, 0, 0, 0,0
+X25519+MLKEM-768,Decaps, 0, 0, 0, 0, 0, 0,0
+MLDSA65,Signature, 0, 0, 0, 0, 0, 0,0
+MLDSA65,Verify, 0, 0, 0, 0, 0, 0,0
+
+3. benchmark_fullhandshake_operation_p2p_initiator.csv
+contoh isian file :
+type,role,operation,avg_time_us,calls_per_handshake,total_per_handshake_us,iterations
+Section2,Initiator,KeyGen,0,0,0,0
+Section2,Initiator,Encaps,0,0,0,0
+Section2,Initiator,Decaps,0,0,0,0
+Section2,Initiator,HKDF-EXTRACT,0,0,0,0
+Section2,Initiator,HKDF-EXPANDS,0,0,0,0
+Section2,Initiator,HASH,0,0,0,0
+Section2,Initiator,AEAD_ENCRYPT,0,0,0,0
+Section2,Initiator,AEAD_DECRYPT,0,0,0,0
+Section2,Initiator,Signature,0,0,0,0
+Section2,Initiator,Verify,0,0,0,0
+
+Section32,Initiator,KeyGen,0,0,0,0
+Section32,Initiator,Encaps,0,0,0,0
+Section32,Initiator,Decaps,0,0,0,0
+Section32,Initiator,HKDF-EXTRACT,0,0,0,0
+Section32,Initiator,HKDF-EXPANDS,0,0,0,0
+Section32,Initiator,HASH,0,0,0,0
+Section32,Initiator,AEAD_ENCRYPT,0,0,0,0
+Section32,Initiator,AEAD_DECRYPT,0,0,0,0
+Section32,Initiator,Signature,0,0,0,0
+Section32,Initiator,Verify,0,0,0,0
+
+Section33,Initiator,KeyGen,0,0,0,0
+Section33,Initiator,Scalar multiplication,0,0,0,0
+Section33,Initiator,HKDF-EXTRACT,0,0,0,0
+Section33,Initiator,HKDF-EXPANDS,0,0,0,0
+Section33,Initiator,HASH,0,0,0,0
+Section33,Initiator,AEAD_ENCRYPT,0,0,0,0
+Section33,Initiator,AEAD_DECRYPT,0,0,0,0
+Section33,Initiator,Signature,0,0,0,0
+Section33,Initiator,Verify,0,0,0,0
+
+Section34,Initiator,KeyGen,0,0,0,0
+Section34,Initiator,Encaps,0,0,0,0
+Section34,Initiator,Decaps,0,0,0,0
+Section34,Initiator,HKDF-EXTRACT,0,0,0,0
+Section34,Initiator,HKDF-EXPANDS,0,0,0,0
+Section34,Initiator,HASH,0,0,0,0
+Section34,Initiator,AEAD_ENCRYPT,0,0,0,0
+Section34,Initiator,AEAD_DECRYPT,0,0,0,0
+Section34,Initiator,Signature,0,0,0,0
+Section34,Initiator,Verify,0,0,0,0
+
+Section35,Initiator,KeyGen,0,0,0,0
+Section35,Initiator,Encaps,0,0,0,0
+Section35,Initiator,Decaps,0,0,0,0
+Section35,Initiator,HKDF-EXTRACT,0,0,0,0
+Section35,Initiator,HKDF-EXPANDS,0,0,0,0
+Section35,Initiator,HASH,0,0,0,0
+Section35,Initiator,AEAD_ENCRYPT,0,0,0,0
+Section35,Initiator,AEAD_DECRYPT,0,0,0,0
+Section35,Initiator,Signature,0,0,0,0
+Section35,Initiator,Verify,0,0,0,0
+
+4. benchmark_fullhandshake_operation_p2p_responder.csv
+contoh isian file :
+type,role,operation,avg_time_us,calls_per_handshake,total_per_handshake_us,iterations
+Section2,Responder,KeyGen,0,0,0,0
+Section2,Responder,Scalar multiplication,0,0,0,0
+Section2,Responder,HKDF-EXTRACT,0,0,0,0
+Section2,Responder,HKDF-EXPANDS,0,0,0,0
+Section2,Responder,HASH,0,0,0,0
+Section2,Responder,AEAD_ENCRYPT,0,0,0,0
+Section2,Responder,AEAD_DECRYPT,0,0,0,0
+Section2,Responder,Signature,0,0,0,0
+Section2,Responder,Verify,0,0,0,0
+
+Section32,Responder,KeyGen,0,0,0,0
+Section32,Responder,Encaps,0,0,0,0
+Section32,Responder,Decaps,0,0,0,0
+Section32,Responder,HKDF-EXTRACT,0,0,0,0
+Section32,Responder,HKDF-EXPANDS,0,0,0,0
+Section32,Responder,HASH,0,0,0,0
+Section32,Responder,AEAD_ENCRYPT,0,0,0,0
+Section32,Responder,AEAD_DECRYPT,0,0,0,0
+Section32,Responder,Signature,0,0,0,0
+Section32,Responder,Verify,0,0,0,0
+
+Section33,Responder,KeyGen,0,0,0,0
+Section33,Responder,Scalar multiplication,0,0,0,0
+Section33,Responder,HKDF-EXTRACT,0,0,0,0
+Section33,Responder,HKDF-EXPANDS,0,0,0,0
+Section33,Responder,HASH,0,0,0,0
+Section33,Responder,AEAD_ENCRYPT,0,0,0,0
+Section33,Responder,AEAD_DECRYPT,0,0,0,0
+Section33,Responder,Signature,0,0,0,0
+Section33,Responder,Verify,0,0,0,0
+
+Section34,Responder,KeyGen,0,0,0,0
+Section34,Responder,Encaps,0,0,0,0
+Section34,Responder,Decaps,0,0,0,0
+Section34,Responder,HKDF-EXTRACT,0,0,0,0
+Section34,Responder,HKDF-EXPANDS,0,0,0,0
+Section34,Responder,HASH,0,0,0,0
+Section34,Responder,AEAD_ENCRYPT,0,0,0,0
+Section34,Responder,AEAD_DECRYPT,0,0,0,0
+Section34,Responder,Signature,0,0,0,0
+Section34,Responder,Verify,0,0,0,0
+
+Section35,Responder,KeyGen,0,0,0,0
+Section35,Responder,Encaps,0,0,0,0
+Section35,Responder,Decaps,0,0,0,0
+Section35,Responder,HKDF-EXTRACT,0,0,0,0
+Section35,Responder,HKDF-EXPANDS,0,0,0,0
+Section35,Responder,HASH,0,0,0,0
+Section35,Responder,AEAD_ENCRYPT,0,0,0,0
+Section35,Responder,AEAD_DECRYPT,0,0,0,0
+Section35,Responder,Signature,0,0,0,0
+Section35,Responder,Verify,0,0,0,0
+
+5. benchmark_fullhandshake_overhead_p2p_initiator.csv
+type,role,cpu_time_us,cpu_usage_percentage,memory_bytes,memory_us
+Section2,Initiator,0,0,0,0
+Section32,Initiator,0,0,0,0
+Section33,Initiator,0,0,0,0 
+Section34,Initiator,0,0,0,0
+Section35,Initiator,0,0,0,0
+
+6. benchmark_fullhandshake_overhead_p2p_responder.csv
+type,role,cpu_time_us,cpu_usage_percentage,memory_bytes,memory_us
+Section2,Responder,0,0,0,0
+Section32,Responder,0,0,0,0
+Section33,Responder,0,0,0,0 
+Section34,Responder,0,0,0,0
+Section35,Responder,0,0,0,0
+
+7. benchmark_fullhandshake_processing_p2p_initiator.csv
+type,role,processing_us,txrx_us,precomputation_us,overhead_us,total_us
+Section2,Initiator,0,0,0,0,0
+Section32,Initiator,0,0,0,0,0
+Section33,Initiator,0,0,0,0,0 
+Section34,Initiator,0,0,0,0,0
+Section35,Initiator,0,0,0,0,0
+
+
+8. benchmark_fullhandshake_processing_p2p_responder.csv
+type,role,processing_us,txrx_us,precomputation_us,overhead_us,total_us
+Section2,Responder,0,0,0,0,0
+Section32,Responder,0,0,0,0,0
+Section33,Responder,0,0,0,0,0 
+Section34,Responder,0,0,0,0,0
+Section35,Responder,0,0,0,0,0
+
+
+ikuti alur dari mermaid dari section2 : 
+sequenceDiagram
+    autonumber
+    participant I as Initiator<br/>ML-DSA (sign.pk_I, sign.sk_I)
+    participant R as Responder<br/>ML-KEM (kem.pk_R, kem.sk_R)<br/>Pre-provisioned to I
+
+    Note over I,R: draft-papon-lake-pq-edhoc Section 2: PQ-EDHOC-IKR
+    Note over I,R: I Auth: Signature | R Auth: KEM | Messages: 3+1<br/>Shared Secrets: ss_eph, ss_R | Equivalent: ~Method 1 (IKR)
+
+    Note over I: === Prepare Message 1 ===<br/>1. Generate (kem.sk_eph, kem.pk_eph) = ML-KEM.KeyGen()<br/>2. (ss_R, kem.ct_R) = ML-KEM.Encaps(kem.pk_R)<br/>   → ss_R kept secret, kem.ct_R sent in Msg1<br/>3. Message_1 = (METHOD, SUITES_I, kem.pk_eph,<br/>                 kem.ct_R, C_I, EAD_1)
+
+    I->>R: message_1
+
+    Note over R: === Process Msg1 & Prepare Msg2 ===<br/>1. ss_R = ML-KEM.Decaps(kem.ct_R, kem.sk_R)<br/>2. (ss_eph, kem.ct_eph) = ML-KEM.Encaps(kem.pk_eph)<br/>3. TH_2 = H(kem.ct_eph, H(message_1))<br/>4. PRK_2e = EDHOC_Extract(TH_2, ss_eph)<br/>5. KEYSTREAM_2 = EDHOC_KDF(PRK_2e, 0, TH_2, ptlen)<br/>6. SALT_3e2m = EDHOC_KDF(PRK_2e, 1, TH_2, hlen)<br/>7. PRK_3e2m = EDHOC_Extract(SALT_3e2m, ss_R)<br/>8. ctx_2 = (C_R, ID_CRED_R, TH_2, EAD_2)<br/>9. MAC_2 = EDHOC_KDF(PRK_3e2m, 2, ctx_2, maclen_2)<br/>   → Authenticates R implicitly (via ss_R)<br/>10. PLAINTEXT_2 = (C_R, ID_CRED_R, MAC_2, EAD_2)<br/>11. CIPHERTEXT_2 = PLAINTEXT_2 XOR KEYSTREAM_2<br/>12. message_2 = (kem.ct_eph, CIPHERTEXT_2)
+
+    R->>I: message_2
+
+    Note over I: === Process Msg2 & Prepare Msg3 ===<br/>1. ss_eph = ML-KEM.Decaps(kem.ct_eph, kem.sk_eph)<br/>2. Compute TH_2, PRK_2e, KEYSTREAM_2<br/>3. PLAINTEXT_2 = CIPHERTEXT_2 XOR KEYSTREAM_2<br/>4. Parse (C_R, ID_CRED_R, MAC_2, EAD_2)<br/>5. Retrieve kem.pk_R from ID_CRED_R<br/>6. Compute SALT_3e2m, PRK_3e2m (using stored ss_R)<br/>7. Verify MAC_2 → authenticates R<br/>8. TH_3 = H(TH_2, PLAINTEXT_2, ID_CRED_R)<br/>9. K_3 = EDHOC_KDF(PRK_3e2m, 3, TH_3, keylen)<br/>10. IV_3 = EDHOC_KDF(PRK_3e2m, 4, TH_3, ivlen)<br/>11. ctx_3 = (ID_CRED_I, TH_3, EAD_3)<br/>12. MAC_3 = EDHOC_KDF(PRK_3e2m, 6, ctx_3, maclen_3)<br/>13. SIGNATURE_3 = ML-DSA.Sign(sign.sk_I,<br/>     (ID_CRED_I, TH_3, EAD_3, MAC_3))<br/>14. PLAINTEXT_3 = (ID_CRED_I, SIGNATURE_3, EAD_3)<br/>15. CIPHERTEXT_3 = AEAD.Enc(K_3, IV_3, PLAINTEXT_3)<br/>16. message_3 = CIPHERTEXT_3
+
+    I->>R: message_3
+
+    Note over R: === Process Msg3 ===<br/>1. Compute TH_3, K_3, IV_3<br/>2. PLAINTEXT_3 = AEAD.Dec(K_3, IV_3, CIPHERTEXT_3)<br/>3. Retrieve sign.pk_I from ID_CRED_I<br/>4. Recompute MAC_3<br/>5. Verify ML-DSA.Verify(sign.pk_I,<br/>     (ID_CRED_I, TH_3, EAD_3, MAC_3), SIGNATURE_3)<br/>6. TH_4 = H(TH_3, PLAINTEXT_3, ID_CRED_I)<br/>7. PRK_out = EDHOC_KDF(PRK_3e2m, 7, TH_4, hlen)
+
+    Note over I,R: === AKE Complete: both parties share PRK_out ===
+
+    rect rgba(200, 200, 200, 0.2)
+    Note over I,R: === Optional message_4 ===
+    Note over R: K_4 = EDHOC_KDF(PRK_3e2m, 8, TH_4, keylen)<br/>IV_4 = EDHOC_KDF(PRK_3e2m, 9, TH_4, ivlen)<br/>PLAINTEXT_4 = EAD_4<br/>message_4 = AEAD.Enc(K_4, IV_4, PLAINTEXT_4)
+    R-->>I: message_4
+    Note over I: Compute TH_4, K_4, IV_4<br/>Decrypt message_4<br/>PRK_out = EDHOC_KDF(PRK_3e2m, 7, TH_4, hlen)
+    end
+
+
+ikuti alur dari mermaid dari section32 : 
+sequenceDiagram
+    autonumber
+    participant I as Initiator<br/>ML-DSA (sign.pk_I, sign.sk_I)
+    participant R as Responder<br/>ML-KEM (kem.pk_R, kem.sk_R)<br/>ML-DSA (sign.pk_R, sign.sk_R)
+
+    Note over I,R: draft-papon-lake-pq-edhoc Section 3.2: First Case
+    Note over I,R: I Auth: Signature | R Auth: KEM + Signature | Messages: 3+1<br/>Shared Secrets: ss_eph, ss_R | Equivalent: Method 1
+
+    Note over I: === Prepare Message 1 ===<br/>1. Generate (kem.sk_eph, kem.pk_eph) = ML-KEM.KeyGen()<br/>2. Message_1 = (METHOD, SUITES_I, kem.pk_eph, C_I, EAD_1)<br/>   → No static KEM operation yet (I doesn't know kem.pk_R)
+
+    I->>R: message_1
+
+    Note over R: === Process Msg1 & Prepare Msg2 ===<br/>1. (ss_eph, kem.ct_eph) = ML-KEM.Encaps(kem.pk_eph)<br/>2. TH_2 = H(kem.ct_eph, H(message_1))<br/>3. PRK_2e = EDHOC_Extract(TH_2, ss_eph)<br/>4. KEYSTREAM_2 = EDHOC_KDF(PRK_2e, 0, TH_2, ptlen)<br/>5. PLAINTEXT_2 = (C_R, ID_CRED_R, TH_2, EAD_2)<br/>6. SIGNATURE_2 = ML-DSA.Sign(sign.sk_R, PLAINTEXT_2)<br/>   → R authenticates via signature (no MAC_2)<br/>7. PLAINTEXT_2A = (PLAINTEXT_2, SIGNATURE_2)<br/>8. CIPHERTEXT_2 = PLAINTEXT_2A XOR KEYSTREAM_2<br/>9. message_2 = (kem.ct_eph, CIPHERTEXT_2)
+
+    R->>I: message_2
+
+    Note over I: === Process Msg2 & Prepare Msg3 ===<br/>1. ss_eph = ML-KEM.Decaps(kem.ct_eph, kem.sk_eph)<br/>2. Compute TH_2, PRK_2e, KEYSTREAM_2<br/>3. PLAINTEXT_2A = CIPHERTEXT_2 XOR KEYSTREAM_2<br/>4. Retrieve kem.pk_R, sign.pk_R from ID_CRED_R<br/>5. Verify ML-DSA.Verify(sign.pk_R,<br/>     PLAINTEXT_2, SIGNATURE_2)<br/>   → R authenticated<br/>6. (ss_R, kem.ct_R) = ML-KEM.Encaps(kem.pk_R)<br/>   → ss_R generated NOW (not in Msg1)<br/>7. SALT_3e2m = EDHOC_KDF(PRK_2e, 1, TH_2, hlen)<br/>8. PRK_3e2m = EDHOC_Extract(SALT_3e2m, ss_R)<br/>9. TH_3 = H(TH_2, PLAINTEXT_2A, ID_CRED_R)<br/>10. K_3 = EDHOC_KDF(PRK_3e2m, 3, TH_3, keylen)<br/>11. IV_3 = EDHOC_KDF(PRK_3e2m, 4, TH_3, ivlen)<br/>12. ctx_3 = (ID_CRED_I, TH_3, EAD_3)<br/>13. MAC_3 = EDHOC_KDF(PRK_3e2m, 6, ctx_3, maclen_3)<br/>14. SIGNATURE_3 = ML-DSA.Sign(sign.sk_I,<br/>     (ID_CRED_I, TH_3, EAD_3, MAC_3))<br/>15. PLAINTEXT_3 = (ID_CRED_I, SIGNATURE_3, EAD_3)<br/>16. CIPHERTEXT_3 = AEAD.Enc(K_3, IV_3, PLAINTEXT_3)<br/>17. message_3 = (kem.ct_R, CIPHERTEXT_3)<br/>    → kem.ct_R carried here (not in Msg1)
+
+    I->>R: message_3
+
+    Note over R: === Process Msg3 ===<br/>1. ss_R = ML-KEM.Decaps(kem.ct_R, kem.sk_R)<br/>2. Compute SALT_3e2m, PRK_3e2m<br/>3. Compute TH_3, K_3, IV_3<br/>4. PLAINTEXT_3 = AEAD.Dec(K_3, IV_3, CIPHERTEXT_3)<br/>5. Retrieve sign.pk_I from ID_CRED_I<br/>6. Recompute MAC_3<br/>7. Verify ML-DSA.Verify(sign.pk_I,<br/>     (ID_CRED_I, TH_3, EAD_3, MAC_3), SIGNATURE_3)<br/>8. TH_4 = H(TH_3, PLAINTEXT_3, ID_CRED_I)<br/>9. PRK_out = EDHOC_KDF(PRK_3e2m, 7, TH_4, hlen)
+
+    Note over I,R: === AKE Complete: both parties share PRK_out ===
+
+    rect rgba(200, 200, 200, 0.2)
+    Note over I,R: === Optional message_4 ===
+    R-->>I: message_4 = AEAD.Enc(K_4, IV_4, EAD_4)
+    end
+
+
+ikuti alur dari mermaid dari section33 : 
+sequenceDiagram
+    autonumber
+    participant I as Initiator<br/>ML-KEM (kem.pk_I, kem.sk_I)<br/>ML-DSA (sign.pk_I, sign.sk_I)
+    participant R as Responder<br/>ML-DSA (sign.pk_R, sign.sk_R)
+
+    Note over I,R: draft-papon-lake-pq-edhoc Section 3.3: Second Case
+    Note over I,R: I Auth: KEM + Signature | R Auth: Signature | Messages: 4 (mandatory)<br/>Shared Secrets: ss_eph, ss_I | Equivalent: Method 2
+
+    Note over I: === Prepare Message 1 ===<br/>1. Generate (kem.sk_eph, kem.pk_eph) = ML-KEM.KeyGen()<br/>2. Message_1 = (METHOD, SUITES_I, kem.pk_eph, C_I, EAD_1)
+
+    I->>R: message_1
+
+    Note over R: === Process Msg1 & Prepare Msg2 ===<br/>1. (ss_eph, kem.ct_eph) = ML-KEM.Encaps(kem.pk_eph)<br/>2. TH_2 = H(kem.ct_eph, H(message_1))<br/>3. PRK_2e = EDHOC_Extract(TH_2, ss_eph)<br/>4. KEYSTREAM_2 = EDHOC_KDF(PRK_2e, 0, TH_2, ptlen)<br/>5. ctx_2 = (C_R, ID_CRED_R, TH_2, EAD_2)<br/>6. MAC_2 = EDHOC_KDF(PRK_2e, 2, ctx_2, maclen_2)<br/>   → MAC derived from PRK_2e (ss_eph only)<br/>7. SIGNATURE_2 = ML-DSA.Sign(sign.sk_R,<br/>     (C_R, ID_CRED_R, TH_2, EAD_2, MAC_2))<br/>8. PLAINTEXT_2 = (C_R, ID_CRED_R, SIGNATURE_2, EAD_2)<br/>9. CIPHERTEXT_2 = PLAINTEXT_2 XOR KEYSTREAM_2<br/>10. message_2 = (kem.ct_eph, CIPHERTEXT_2)
+
+    R->>I: message_2
+
+    Note over I: === Process Msg2 & Prepare Msg3 ===<br/>1. ss_eph = ML-KEM.Decaps(kem.ct_eph, kem.sk_eph)<br/>2. Compute TH_2, PRK_2e, KEYSTREAM_2<br/>3. PLAINTEXT_2 = CIPHERTEXT_2 XOR KEYSTREAM_2<br/>4. Retrieve sign.pk_R from ID_CRED_R<br/>5. Recompute MAC_2<br/>6. Verify ML-DSA.Verify(sign.pk_R,<br/>     (..., MAC_2), SIGNATURE_2)<br/>7. TH_3 = H(TH_2, PLAINTEXT_2, ID_CRED_R)<br/>8. K_3 = EDHOC_KDF(PRK_2e, 3, TH_3, keylen)<br/>9. IV_3 = EDHOC_KDF(PRK_2e, 4, TH_3, ivlen)<br/>10. PLAINTEXT_3 = (ID_CRED_I, TH_3, EAD_3)<br/>    → ID_CRED_I includes kem.pk_I reference<br/>11. SIGNATURE_3 = ML-DSA.Sign(sign.sk_I, PLAINTEXT_3)<br/>12. PLAINTEXT_3A = (PLAINTEXT_3, SIGNATURE_3)<br/>13. CIPHERTEXT_3 = AEAD.Enc(K_3, IV_3, PLAINTEXT_3A)<br/>14. message_3 = CIPHERTEXT_3
+
+    I->>R: message_3
+
+    Note over R: === Process Msg3 & Prepare Msg4 ===<br/>1. Compute TH_3, K_3, IV_3<br/>2. PLAINTEXT_3A = AEAD.Dec(K_3, IV_3, CIPHERTEXT_3)<br/>3. Retrieve kem.pk_I, sign.pk_I from ID_CRED_I<br/>4. Verify ML-DSA.Verify(sign.pk_I,<br/>     PLAINTEXT_3, SIGNATURE_3)<br/>5. (ss_I, kem.ct_I) = ML-KEM.Encaps(kem.pk_I)<br/>   → NOW R can do KEM to I (needed kem.pk_I)<br/>6. TH_4 = H(TH_3, PLAINTEXT_3A, ID_CRED_I)<br/>7. SALT_4e3m = EDHOC_KDF(PRK_2e, 5, TH_4, hlen)<br/>8. PRK_4e3m = EDHOC_Extract(SALT_4e3m, ss_I)<br/>9. K_4 = EDHOC_KDF(PRK_4e3m, 8, TH_4, keylen)<br/>10. IV_4 = EDHOC_KDF(PRK_4e3m, 9, TH_4, ivlen)<br/>11. PLAINTEXT_4 = EAD_4<br/>12. CIPHERTEXT_4 = AEAD.Enc(K_4, IV_4, PLAINTEXT_4)<br/>13. message_4 = (kem.ct_I, CIPHERTEXT_4)<br/>14. PRK_out = EDHOC_KDF(PRK_4e3m, 7, TH_4, hlen)
+
+    rect rgba(255, 180, 180, 0.2)
+    Note over I,R: === message_4 MANDATORY (delivers kem.ct_I) ===
+    R->>I: message_4
+    end
+
+    Note over I: === Finalize ===<br/>1. Parse (kem.ct_I, CIPHERTEXT_4)<br/>2. ss_I = ML-KEM.Decaps(kem.ct_I, kem.sk_I)<br/>3. Compute TH_4, SALT_4e3m, PRK_4e3m, K_4, IV_4<br/>4. Decrypt CIPHERTEXT_4 → EAD_4<br/>5. PRK_out = EDHOC_KDF(PRK_4e3m, 7, TH_4, hlen)
+
+    Note over I,R: === AKE Complete: both parties share PRK_out ===
+
+
+ikuti alur dari mermaid dari section34 : 
+sequenceDiagram
+    autonumber
+    participant I as Initiator<br/>ML-KEM (kem.pk_I, kem.sk_I)<br/>ML-DSA (sign.pk_I, sign.sk_I)
+    participant R as Responder<br/>ML-KEM (kem.pk_R, kem.sk_R)<br/>ML-DSA (sign.pk_R, sign.sk_R)
+
+    Note over I,R: draft-papon-lake-pq-edhoc Section 3.5: Third Case v2
+    Note over I,R: I Auth: KEM + Signature | R Auth: KEM + Signature | Messages: 4 (mandatory)<br/>Shared Secrets: ss_eph, ss_R, ss_I | Equivalent: Method 3 v2 (Full Hybrid)
+
+    Note over I: === Prepare Message 1 ===<br/>1. Generate (kem.sk_eph, kem.pk_eph) = ML-KEM.KeyGen()<br/>2. Message_1 = (METHOD, SUITES_I, kem.pk_eph, C_I, EAD_1)
+
+    I->>R: message_1
+
+    Note over R: === Process Msg1 & Prepare Msg2 ===<br/>1. (ss_eph, kem.ct_eph) = ML-KEM.Encaps(kem.pk_eph)<br/>2. TH_2 = H(kem.ct_eph, H(message_1))<br/>3. PRK_2e = EDHOC_Extract(TH_2, ss_eph)<br/>4. KEYSTREAM_2 = EDHOC_KDF(PRK_2e, 0, TH_2, ptlen)<br/>5. PLAINTEXT_2 = (C_R, ID_CRED_R, TH_2, EAD_2)<br/>6. SIGNATURE_2 = ML-DSA.Sign(sign.sk_R, PLAINTEXT_2)<br/>   → R authenticates early (via signature in Msg2)<br/>7. PLAINTEXT_2A = (PLAINTEXT_2, SIGNATURE_2)<br/>8. CIPHERTEXT_2 = PLAINTEXT_2A XOR KEYSTREAM_2<br/>9. message_2 = (kem.ct_eph, CIPHERTEXT_2)
+
+    R->>I: message_2
+
+    Note over I: === Process Msg2 & Prepare Msg3 ===<br/>1. ss_eph = ML-KEM.Decaps(kem.ct_eph, kem.sk_eph)<br/>2. Compute TH_2, PRK_2e, KEYSTREAM_2<br/>3. PLAINTEXT_2A = CIPHERTEXT_2 XOR KEYSTREAM_2<br/>4. Retrieve kem.pk_R, sign.pk_R from ID_CRED_R<br/>5. Verify ML-DSA.Verify(sign.pk_R,<br/>     PLAINTEXT_2, SIGNATURE_2)<br/>6. (ss_R, kem.ct_R) = ML-KEM.Encaps(kem.pk_R)<br/>7. SALT_3e2m = EDHOC_KDF(PRK_2e, 1, TH_2, hlen)<br/>8. PRK_3e2m = EDHOC_Extract(SALT_3e2m, ss_R)<br/>9. TH_3 = H(TH_2, PLAINTEXT_2A, ID_CRED_R)<br/>10. K_3 = EDHOC_KDF(PRK_3e2m, 3, TH_3, keylen)<br/>11. IV_3 = EDHOC_KDF(PRK_3e2m, 4, TH_3, ivlen)<br/>12. PLAINTEXT_3 = (ID_CRED_I, TH_3, EAD_3)<br/>13. SIGNATURE_3 = ML-DSA.Sign(sign.sk_I, PLAINTEXT_3)<br/>14. PLAINTEXT_3A = (PLAINTEXT_3, SIGNATURE_3)<br/>15. CIPHERTEXT_3 = AEAD.Enc(K_3, IV_3, PLAINTEXT_3A)<br/>16. message_3 = (kem.ct_R, CIPHERTEXT_3)
+
+    I->>R: message_3
+
+    Note over R: === Process Msg3 & Prepare Msg4 ===<br/>1. ss_R = ML-KEM.Decaps(kem.ct_R, kem.sk_R)<br/>2. Compute SALT_3e2m, PRK_3e2m<br/>3. Compute TH_3, K_3, IV_3<br/>4. PLAINTEXT_3A = AEAD.Dec(K_3, IV_3, CIPHERTEXT_3)<br/>5. Retrieve kem.pk_I, sign.pk_I from ID_CRED_I<br/>6. Verify ML-DSA.Verify(sign.pk_I,<br/>     PLAINTEXT_3, SIGNATURE_3)<br/>7. (ss_I, kem.ct_I) = ML-KEM.Encaps(kem.pk_I)<br/>8. TH_4 = H(TH_3, PLAINTEXT_3A, ID_CRED_I)<br/>9. SALT_4e3m = EDHOC_KDF(PRK_3e2m, 5, TH_4, hlen)<br/>10. PRK_4e3m = EDHOC_Extract(SALT_4e3m, ss_I)<br/>11. K_4 = EDHOC_KDF(PRK_4e3m, 8, TH_4, keylen)<br/>12. IV_4 = EDHOC_KDF(PRK_4e3m, 9, TH_4, ivlen)<br/>13. PLAINTEXT_4 = EAD_4<br/>14. CIPHERTEXT_4 = AEAD.Enc(K_4, IV_4, PLAINTEXT_4)<br/>15. message_4 = (kem.ct_I, CIPHERTEXT_4)<br/>16. PRK_out = EDHOC_KDF(PRK_4e3m, 7, TH_4, hlen)
+
+    rect rgba(255, 180, 180, 0.2)
+    Note over I,R: === message_4 MANDATORY (delivers kem.ct_I) ===
+    R->>I: message_4
+    end
+
+    Note over I: === Finalize ===<br/>1. Parse (kem.ct_I, CIPHERTEXT_4)<br/>2. ss_I = ML-KEM.Decaps(kem.ct_I, kem.sk_I)<br/>3. Compute TH_4, SALT_4e3m, PRK_4e3m, K_4, IV_4<br/>4. Decrypt CIPHERTEXT_4 → EAD_4<br/>5. PRK_out = EDHOC_KDF(PRK_4e3m, 7, TH_4, hlen)
+
+    Note over I,R: === AKE Complete: both parties share PRK_out ===
+
+
+ikuti alur dari mermaid dari section35 : 
+
+sequenceDiagram
+    autonumber
+    participant I as Initiator<br/>ML-KEM (kem.pk_I, kem.sk_I)<br/>ML-DSA (sign.pk_I, sign.sk_I)
+    participant R as Responder<br/>ML-KEM (kem.pk_R, kem.sk_R)<br/>ML-DSA (sign.pk_R, sign.sk_R)
+
+    Note over I,R: draft-papon-lake-pq-edhoc Section 3.5: Third Case v2
+    Note over I,R: I Auth: KEM + Signature | R Auth: KEM + Signature | Messages: 4 (mandatory)<br/>Shared Secrets: ss_eph, ss_R, ss_I | Equivalent: Method 3 v2 (Full Hybrid)
+
+    Note over I: === Prepare Message 1 ===<br/>1. Generate (kem.sk_eph, kem.pk_eph) = ML-KEM.KeyGen()<br/>2. Message_1 = (METHOD, SUITES_I, kem.pk_eph, C_I, EAD_1)
+
+    I->>R: message_1
+
+    Note over R: === Process Msg1 & Prepare Msg2 ===<br/>1. (ss_eph, kem.ct_eph) = ML-KEM.Encaps(kem.pk_eph)<br/>2. TH_2 = H(kem.ct_eph, H(message_1))<br/>3. PRK_2e = EDHOC_Extract(TH_2, ss_eph)<br/>4. KEYSTREAM_2 = EDHOC_KDF(PRK_2e, 0, TH_2, ptlen)<br/>5. PLAINTEXT_2 = (C_R, ID_CRED_R, TH_2, EAD_2)<br/>6. SIGNATURE_2 = ML-DSA.Sign(sign.sk_R, PLAINTEXT_2)<br/>   → R authenticates early (via signature in Msg2)<br/>7. PLAINTEXT_2A = (PLAINTEXT_2, SIGNATURE_2)<br/>8. CIPHERTEXT_2 = PLAINTEXT_2A XOR KEYSTREAM_2<br/>9. message_2 = (kem.ct_eph, CIPHERTEXT_2)
+
+    R->>I: message_2
+
+    Note over I: === Process Msg2 & Prepare Msg3 ===<br/>1. ss_eph = ML-KEM.Decaps(kem.ct_eph, kem.sk_eph)<br/>2. Compute TH_2, PRK_2e, KEYSTREAM_2<br/>3. PLAINTEXT_2A = CIPHERTEXT_2 XOR KEYSTREAM_2<br/>4. Retrieve kem.pk_R, sign.pk_R from ID_CRED_R<br/>5. Verify ML-DSA.Verify(sign.pk_R,<br/>     PLAINTEXT_2, SIGNATURE_2)<br/>6. (ss_R, kem.ct_R) = ML-KEM.Encaps(kem.pk_R)<br/>7. SALT_3e2m = EDHOC_KDF(PRK_2e, 1, TH_2, hlen)<br/>8. PRK_3e2m = EDHOC_Extract(SALT_3e2m, ss_R)<br/>9. TH_3 = H(TH_2, PLAINTEXT_2A, ID_CRED_R)<br/>10. K_3 = EDHOC_KDF(PRK_3e2m, 3, TH_3, keylen)<br/>11. IV_3 = EDHOC_KDF(PRK_3e2m, 4, TH_3, ivlen)<br/>12. PLAINTEXT_3 = (ID_CRED_I, TH_3, EAD_3)<br/>13. SIGNATURE_3 = ML-DSA.Sign(sign.sk_I, PLAINTEXT_3)<br/>14. PLAINTEXT_3A = (PLAINTEXT_3, SIGNATURE_3)<br/>15. CIPHERTEXT_3 = AEAD.Enc(K_3, IV_3, PLAINTEXT_3A)<br/>16. message_3 = (kem.ct_R, CIPHERTEXT_3)
+
+    I->>R: message_3
+
+    Note over R: === Process Msg3 & Prepare Msg4 ===<br/>1. ss_R = ML-KEM.Decaps(kem.ct_R, kem.sk_R)<br/>2. Compute SALT_3e2m, PRK_3e2m<br/>3. Compute TH_3, K_3, IV_3<br/>4. PLAINTEXT_3A = AEAD.Dec(K_3, IV_3, CIPHERTEXT_3)<br/>5. Retrieve kem.pk_I, sign.pk_I from ID_CRED_I<br/>6. Verify ML-DSA.Verify(sign.pk_I,<br/>     PLAINTEXT_3, SIGNATURE_3)<br/>7. (ss_I, kem.ct_I) = ML-KEM.Encaps(kem.pk_I)<br/>8. TH_4 = H(TH_3, PLAINTEXT_3A, ID_CRED_I)<br/>9. SALT_4e3m = EDHOC_KDF(PRK_3e2m, 5, TH_4, hlen)<br/>10. PRK_4e3m = EDHOC_Extract(SALT_4e3m, ss_I)<br/>11. K_4 = EDHOC_KDF(PRK_4e3m, 8, TH_4, keylen)<br/>12. IV_4 = EDHOC_KDF(PRK_4e3m, 9, TH_4, ivlen)<br/>13. PLAINTEXT_4 = EAD_4<br/>14. CIPHERTEXT_4 = AEAD.Enc(K_4, IV_4, PLAINTEXT_4)<br/>15. message_4 = (kem.ct_I, CIPHERTEXT_4)<br/>16. PRK_out = EDHOC_KDF(PRK_4e3m, 7, TH_4, hlen)
+
+    rect rgba(255, 180, 180, 0.2)
+    Note over I,R: === message_4 MANDATORY (delivers kem.ct_I) ===
+    R->>I: message_4
+    end
+
+    Note over I: === Finalize ===<br/>1. Parse (kem.ct_I, CIPHERTEXT_4)<br/>2. ss_I = ML-KEM.Decaps(kem.ct_I, kem.sk_I)<br/>3. Compute TH_4, SALT_4e3m, PRK_4e3m, K_4, IV_4<br/>4. Decrypt CIPHERTEXT_4 → EAD_4<br/>5. PRK_out = EDHOC_KDF(PRK_4e3m, 7, TH_4, hlen)
+
+    Note over I,R: === AKE Complete: both parties share PRK_out ===

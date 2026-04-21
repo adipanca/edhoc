@@ -1,6 +1,0 @@
-type,edhoc_msgs,msg1_bytes,msg1_frags,msg2_bytes,msg2_frags,msg3_bytes,msg3_frags,msg4_bytes,msg4_frags,total_fragments,frag_ack_roundtrips,total_eap_roundtrips
-Type0_classic,3,35,1,98,1,81,1,0,0,3,0,5
-Type0_PQ,3,1187,2,4399,5,3326,4,0,0,11,8,13
-Type3_Classic,3,35,1,66,1,49,1,0,0,3,0,5
-Type3_PQ,4,2287,3,2197,3,17,1,9,1,8,4,11
-Type3_Hybrid,3,1216,2,1160,2,40,1,0,0,5,2,7

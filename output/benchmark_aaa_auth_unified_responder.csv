@@ -1,6 +1,0 @@
-type,attempts,accepted,rejected,avg_auth_ms,aaa_required,mode
-Type0_classic,1,1,0,1047.837,1,unified
-Type0_PQ,1,1,0,1024.788,1,unified
-Type3_Classic,1,1,0,1023.307,1,unified
-Type3_PQ,1,1,0,1103.436,1,unified
-Type3_Hybrid,1,1,0,1111.729,1,unified
