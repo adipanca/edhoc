@@ -40,6 +40,7 @@ MBEDTLS_INC_DIR    = $(MBEDTLS_DIR)/include
 # Targets
 TARGET_INITIATOR = $(BUILD_DIR)/eap_initiator
 TARGET_RESPONDER = $(BUILD_DIR)/eap_responder
+TARGET_AAA_RESPONDER = $(BUILD_DIR)/eap_aaa_responder
 
 # ── Source files ──
 COMMON_SRCS  = $(SRC_DIR)/benchmark_p2p_common.c
@@ -53,6 +54,7 @@ COMMON_SRCS += $(SRC_DIR)/eap_variant_type3_hybrid.c
 
 INITIATOR_SRC = $(SRC_DIR)/benchmark_eap_initiator.c
 RESPONDER_SRC = $(SRC_DIR)/benchmark_eap_responder.c
+AAA_RESPONDER_SRC = $(SRC_DIR)/benchmark_eap_responder_aaa.c
 
 # PQClean sources
 PQCLEAN_KEM_SRCS    = $(wildcard $(PQCLEAN_KEM_DIR)/*.c)
@@ -66,6 +68,7 @@ MBEDTLS_SRCS = $(wildcard $(MBEDTLS_LIB_DIR)/*.c)
 COMMON_OBJS    = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/eap_%.o,$(COMMON_SRCS))
 INITIATOR_OBJ  = $(BUILD_DIR)/eap_benchmark_eap_initiator.o
 RESPONDER_OBJ  = $(BUILD_DIR)/eap_benchmark_eap_responder.o
+AAA_RESPONDER_OBJ = $(BUILD_DIR)/eap_benchmark_eap_responder_aaa.o
 
 PQCLEAN_KEM_OBJS    = $(patsubst $(PQCLEAN_KEM_DIR)/%.c,$(BUILD_DIR)/eap_pqkem_%.o,$(PQCLEAN_KEM_SRCS))
 PQCLEAN_SIG_OBJS    = $(patsubst $(PQCLEAN_SIG_DIR)/%.c,$(BUILD_DIR)/eap_pqsig_%.o,$(PQCLEAN_SIG_SRCS))
@@ -111,12 +114,13 @@ LDFLAGS = -lsodium -lm
 # ============================================================================
 # Targets
 # ============================================================================
-.PHONY: all initiator responder clean help
+.PHONY: all initiator responder aaa-responder clean help
 
-all: initiator responder
+all: initiator responder aaa-responder
 	@echo ''
 	@echo '  EAP-EDHOC Build complete:'
 	@echo '    EAP Responder (Server): $(TARGET_RESPONDER)'
+	@echo '    EAP Responder (AAA):    $(TARGET_AAA_RESPONDER)'
 	@echo '    EAP Initiator (Peer):   $(TARGET_INITIATOR)'
 	@echo ''
 	@echo '  Run responder first (EAP Server side):'
@@ -128,6 +132,7 @@ all: initiator responder
 
 initiator: $(TARGET_INITIATOR)
 responder: $(TARGET_RESPONDER)
+aaa-responder: $(TARGET_AAA_RESPONDER)
 
 $(TARGET_INITIATOR): $(INITIATOR_OBJ) $(SHARED_OBJS)
 	@mkdir -p $(BUILD_DIR)
@@ -135,6 +140,11 @@ $(TARGET_INITIATOR): $(INITIATOR_OBJ) $(SHARED_OBJS)
 	@echo '=== Linked: $@ ==='
 
 $(TARGET_RESPONDER): $(RESPONDER_OBJ) $(SHARED_OBJS)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $^ $(LDFLAGS) -o $@
+	@echo '=== Linked: $@ ==='
+
+$(TARGET_AAA_RESPONDER): $(AAA_RESPONDER_OBJ) $(SHARED_OBJS)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $^ $(LDFLAGS) -o $@
 	@echo '=== Linked: $@ ==='
@@ -148,6 +158,11 @@ $(BUILD_DIR)/eap_benchmark_eap_initiator.o: $(INITIATOR_SRC)
 
 # EAP Responder main
 $(BUILD_DIR)/eap_benchmark_eap_responder.o: $(RESPONDER_SRC)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(C_INCLUDES) -c $< -o $@
+
+# EAP AAA Responder main
+$(BUILD_DIR)/eap_benchmark_eap_responder_aaa.o: $(AAA_RESPONDER_SRC)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(C_INCLUDES) -c $< -o $@
 
@@ -178,7 +193,7 @@ $(BUILD_DIR)/eap_mbedtls_%.o: $(MBEDTLS_LIB_DIR)/%.c
 
 clean:
 	rm -f $(BUILD_DIR)/eap_*.o
-	rm -f $(TARGET_INITIATOR) $(TARGET_RESPONDER)
+	rm -f $(TARGET_INITIATOR) $(TARGET_RESPONDER) $(TARGET_AAA_RESPONDER)
 	@echo 'EAP benchmark objects cleaned.'
 
 help:
@@ -186,6 +201,7 @@ help:
 	@echo '  all        - Build both EAP initiator and responder (default)'
 	@echo '  initiator  - Build EAP initiator (EAP Peer) only'
 	@echo '  responder  - Build EAP responder (EAP Server) only'
+	@echo '  aaa-responder - Build EAP responder with AAA auth checks'
 	@echo '  clean      - Remove EAP benchmark objects and binaries'
 	@echo ''
 	@echo 'NOTE: PQClean is compiled with -O0 (requirement)'
@@ -193,6 +209,11 @@ help:
 	@echo 'Run order (EAP-EDHOC benchmark):'
 	@echo '  1. Start EAP Server:  ./build/eap_responder [port]'
 	@echo '  2. Start EAP Peer:    ./build/eap_initiator <ip> [port]'
+	@echo ''
+	@echo 'Run order (EAP + AAA benchmark):'
+	@echo '  1. Start FreeRADIUS (see scripts/freeradius_aaa/)'
+	@echo '  2. Start AAA responder: ./build/eap_aaa_responder [port]'
+	@echo '  3. Start EAP Peer:      ./build/eap_initiator <ip> [port]'
 	@echo ''
 	@echo 'EAP-EDHOC variant ranking (fastest → slowest expected):'
 	@echo '  Type3_Classic < Type3_Hybrid < Type0_Classic < Type3_PQ < Type0_PQ'

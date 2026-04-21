@@ -1,18 +1,15 @@
 /*
  * =============================================================================
- * EDHOC-Hybrid: Unified Benchmark — Responder
+ * EDHOC-Hybrid: EAP-EDHOC Benchmark — Responder via AAA (FreeRADIUS)
  * =============================================================================
  *
- * Runs ALL benchmarks (P2P + EAP) in a single binary over one TCP connection.
- *   Phase 1: Pure crypto benchmarks (local)
- *   Phase 2: P2P full handshake (5 variants)
- *   Phase 3: EAP-EDHOC full handshake (5 variants)
- *   Phase 4: Write ALL CSV files
- *
- * Outputs all 9 CSV files (P2P + EAP) to output/
+ * Listens for TCP connections from the EAP-EDHOC Initiator (EAP Peer).
+ * After each successful EDHOC variant handshake, this server performs
+ * AAA authentication against FreeRADIUS using radclient.
+ * Variant handshake functions are in separate eap_variant_*.c files.
  *
  * Usage:
- *   ./build/responder [port]
+ *   ./build/eap_aaa_responder [port]
  */
 
 #ifndef _POSIX_C_SOURCE
@@ -35,15 +32,12 @@
 #include <sodium.h>
 #include <psa/crypto.h>
 
-#include "edhoc_benchmark_eap.h"   /* includes edhoc_benchmark_p2p.h */
+#include "edhoc_benchmark_eap.h"
 #include "edhoc_pq_kem.h"
 
 #include "mbedtls/gcm.h"
 
 #define OUTPUT_DIR "output"
-
-/* Phase-switch sync value: P2P done, EAP next */
-#define PHASE_SWITCH_SIGNAL  0xFE
 
 #define AAA_DEFAULT_SERVER "127.0.0.1"
 #define AAA_DEFAULT_PORT   1812
@@ -52,8 +46,7 @@
 /* Forward declarations */
 static int wait_for_client(int port);
 static void run_crypto_benchmarks(void);
-static int run_p2p_handshakes(int sockfd);
-static void run_eap_handshakes(int sockfd);
+static void run_handshake_benchmarks(int sockfd);
 static void write_all_csv(void);
 static void init_aaa_settings(void);
 static int aaa_authenticate_variant(int variant_id);
@@ -65,7 +58,6 @@ static const char *g_crypto_alg_names[20];
 static const char *g_crypto_op_names[20];
 static int g_crypto_count = 0;
 
-/* Active globals used by variant functions (via extern in headers) */
 struct handshake_op_stats g_hs_ops[NUM_VARIANTS];
 struct handshake_timing g_hs_timing[NUM_VARIANTS];
 struct overhead_stats g_hs_overhead[NUM_VARIANTS];
@@ -82,14 +74,8 @@ static struct aaa_auth_stats g_aaa_auth[NUM_VARIANTS];
 static char g_aaa_server[64] = AAA_DEFAULT_SERVER;
 static int g_aaa_port = AAA_DEFAULT_PORT;
 static char g_aaa_secret[128] = AAA_DEFAULT_SECRET;
-static int g_aaa_enabled = 1;
 static int g_aaa_required = 0;
 static int g_aaa_available = 0;
-
-/* Saved P2P results */
-static struct handshake_op_stats p2p_saved_ops[NUM_VARIANTS];
-static struct handshake_timing p2p_saved_timing[NUM_VARIANTS];
-static struct overhead_stats p2p_saved_overhead[NUM_VARIANTS];
 
 /* =============================================================================
  * MAIN
@@ -97,7 +83,7 @@ static struct overhead_stats p2p_saved_overhead[NUM_VARIANTS];
  */
 int main(int argc, char *argv[])
 {
-	int port = (argc > 1) ? atoi(argv[1]) : P2P_DEFAULT_PORT;
+	int port = (argc > 1) ? atoi(argv[1]) : EAP_DEFAULT_PORT;
 
 	if (sodium_init() < 0) {
 		fprintf(stderr, "ERROR: sodium_init() failed\n");
@@ -106,7 +92,7 @@ int main(int argc, char *argv[])
 	psa_crypto_init();
 	init_aaa_settings();
 
-	if (g_aaa_enabled && !g_aaa_available && g_aaa_required) {
+	if (!g_aaa_available && g_aaa_required) {
 		fprintf(stderr,
 		        "ERROR: radclient not found, but EDHOC_AAA_REQUIRE=1 is set\n");
 		return 1;
@@ -114,15 +100,12 @@ int main(int argc, char *argv[])
 
 	printf("\n");
 	printf("╔══════════════════════════════════════════════════════════════╗\n");
-	printf("║    EDHOC Unified Benchmark — RESPONDER (P2P + EAP)           ║\n");
+	printf("║    EDHOC EAP-EDHOC Benchmark — RESPONDER (AAA/FreeRADIUS)    ║\n");
 	printf("╚══════════════════════════════════════════════════════════════╝\n");
 	printf("  Listening on port: %d\n", port);
-	printf("  AAA in unified EAP phase: %s\n", g_aaa_enabled ? "enabled" : "disabled");
-	if (g_aaa_enabled) {
-		printf("  AAA endpoint: %s:%d\n", g_aaa_server, g_aaa_port);
-		printf("  AAA required: %s\n", g_aaa_required ? "yes" : "no");
-		printf("  radclient: %s\n", g_aaa_available ? "available" : "not found");
-	}
+	printf("  AAA endpoint: %s:%d\n", g_aaa_server, g_aaa_port);
+	printf("  AAA required: %s\n", g_aaa_required ? "yes" : "no");
+	printf("  radclient: %s\n", g_aaa_available ? "available" : "not found");
 	printf("  Crypto iterations: %d\n", P2P_BENCH_CRYPTO_ITERATIONS);
 	printf("  Handshake iterations: %d\n", P2P_BENCH_HANDSHAKE_ITERATIONS);
 	printf("  EAP MTU: %d bytes/fragment\n", EAP_EDHOC_MTU);
@@ -130,45 +113,25 @@ int main(int argc, char *argv[])
 
 	(void)!system("mkdir -p " OUTPUT_DIR);
 
-	/* Phase 1: Pure crypto benchmarks (local) */
 	printf("═══ Phase 1: Pure Cryptographic Operations ═══\n\n");
 	run_crypto_benchmarks();
 
-	/* Wait for initiator */
-	printf("\n═══ Phase 2: Waiting for Initiator Connection ═══\n\n");
+	printf("\n═══ Phase 2: Waiting for EAP Peer Connection ═══\n\n");
 	int sockfd = wait_for_client(port);
 	if (sockfd < 0) {
 		fprintf(stderr, "ERROR: failed to accept client\n");
 		return 1;
 	}
-	printf("  Initiator connected.\n\n");
+	printf("  EAP Peer connected.\n\n");
 
-	/* Phase 2: P2P handshake benchmarks */
-	printf("═══ Phase 2: Full Handshake Benchmarks (P2P) ═══\n\n");
-	int got_eap_phase = run_p2p_handshakes(sockfd);
-
-	/* Save P2P results */
-	memcpy(p2p_saved_ops, g_hs_ops, sizeof(g_hs_ops));
-	memcpy(p2p_saved_timing, g_hs_timing, sizeof(g_hs_timing));
-	memcpy(p2p_saved_overhead, g_hs_overhead, sizeof(g_hs_overhead));
-
-	if (got_eap_phase) {
-		/* Phase 3: EAP-EDHOC handshake benchmarks (same TCP connection) */
-		printf("\n═══ Phase 3: Full Handshake Benchmarks (EAP-EDHOC) ═══\n\n");
-		memset(g_hs_ops, 0, sizeof(g_hs_ops));
-		memset(g_hs_timing, 0, sizeof(g_hs_timing));
-		memset(g_hs_overhead, 0, sizeof(g_hs_overhead));
-		memset(g_eap_transport, 0, sizeof(g_eap_transport));
-		run_eap_handshakes(sockfd);
-	}
+	run_handshake_benchmarks(sockfd);
 
 	close(sockfd);
 
-	/* Phase 4: Write ALL CSV files */
-	printf("\n═══ Phase 4: Writing CSV Output ═══\n\n");
+	printf("\n═══ Phase 3: Writing CSV Output ═══\n\n");
 	write_all_csv();
 
-	printf("\n  Unified benchmark complete (P2P + EAP).\n\n");
+	printf("\n  EAP-EDHOC Benchmark complete.\n\n");
 	return 0;
 }
 
@@ -199,7 +162,7 @@ static int wait_for_client(int port)
 		return -1;
 	}
 
-	printf("  Waiting for initiator on port %d...\n", port);
+	printf("  Waiting for EAP Peer on port %d...\n", port);
 
 	struct sockaddr_in caddr;
 	socklen_t clen = sizeof(caddr);
@@ -219,12 +182,7 @@ static int wait_for_client(int port)
 
 static void init_aaa_settings(void)
 {
-	const char *env = getenv("EDHOC_AAA_ENABLE");
-	if (env && env[0] != '\0' && strcmp(env, "0") == 0) {
-		g_aaa_enabled = 0;
-	}
-
-	env = getenv("EDHOC_AAA_SERVER");
+	const char *env = getenv("EDHOC_AAA_SERVER");
 	if (env && env[0] != '\0') {
 		snprintf(g_aaa_server, sizeof(g_aaa_server), "%s", env);
 	}
@@ -232,7 +190,9 @@ static void init_aaa_settings(void)
 	env = getenv("EDHOC_AAA_PORT");
 	if (env && env[0] != '\0') {
 		int port = atoi(env);
-		if (port > 0 && port <= 65535) g_aaa_port = port;
+		if (port > 0 && port <= 65535) {
+			g_aaa_port = port;
+		}
 	}
 
 	env = getenv("EDHOC_AAA_SECRET");
@@ -250,38 +210,39 @@ static void init_aaa_settings(void)
 
 static int aaa_authenticate_variant(int variant_id)
 {
-	if (!g_aaa_enabled) return 0;
-	if (variant_id < 0 || variant_id >= NUM_VARIANTS) return -1;
+	if (variant_id < 0 || variant_id >= NUM_VARIANTS) {
+		return -1;
+	}
 
 	g_aaa_auth[variant_id].attempts++;
 
 	if (!g_aaa_available) {
 		g_aaa_auth[variant_id].rejected++;
-		fprintf(stderr, "    [AAA] radclient not found (%s)\n",
+		fprintf(stderr, "  [AAA] radclient not found; auth skipped for %s\n",
 		        VARIANT_NAMES[variant_id]);
 		return g_aaa_required ? -1 : 0;
 	}
 
-	const char *variant = VARIANT_NAMES[variant_id];
 	char cmd[1024];
+	const char *variant = VARIANT_NAMES[variant_id];
 	uint64_t t0 = bench_get_ns();
 
 	snprintf(cmd, sizeof(cmd),
 	         "printf 'User-Name = \"edhoc_%s\"\\nUser-Password = \"edhoc-pass\"\\nNAS-IP-Address = 127.0.0.1\\nService-Type = Framed-User\\n' "
-	         "| radclient -x -t 2 -r 1 %s:%d auth '%s' >/tmp/unified_aaa_%s.log 2>&1",
+	         "| radclient -x -t 2 -r 1 %s:%d auth '%s' >/tmp/edhoc_aaa_%s.log 2>&1",
 	         variant, g_aaa_server, g_aaa_port, g_aaa_secret, variant);
 
 	int rc = system(cmd);
 	if (rc != 0) {
+		/* Fallback: validate AAA liveness through Status-Server. */
 		snprintf(cmd, sizeof(cmd),
 		         "printf 'Message-Authenticator = 0x00\\n' "
-		         "| radclient -x -t 2 -r 1 %s:%d status '%s' >/tmp/unified_aaa_%s_status.log 2>&1",
+		         "| radclient -x -t 2 -r 1 %s:%d status '%s' >/tmp/edhoc_aaa_%s_status.log 2>&1",
 		         g_aaa_server, g_aaa_port, g_aaa_secret, variant);
 		rc = system(cmd);
 	}
-
 	uint64_t t1 = bench_get_ns();
-	double elapsed_ms = ns_to_us(t1 - t0) / 1000.0;
+	float elapsed_ms = (float)ns_to_us(t1 - t0) / 1000.0f;
 	g_aaa_auth[variant_id].total_auth_ms += elapsed_ms;
 
 	if (rc == 0) {
@@ -606,79 +567,15 @@ static void run_crypto_benchmarks(void)
 }
 
 /* =============================================================================
- * Phase 2: P2P Handshakes (event loop)
- * Returns 1 if phase-switch to EAP was received, 0 if 0xFF (all done).
+ * Phase 2: Run all EAP-EDHOC handshake variants (event loop)
  * =============================================================================
  */
-static int run_p2p_handshakes(int sockfd)
+static void run_handshake_benchmarks(int sockfd)
 {
 	memset(g_hs_ops, 0, sizeof(g_hs_ops));
 	memset(g_hs_timing, 0, sizeof(g_hs_timing));
 	memset(g_hs_overhead, 0, sizeof(g_hs_overhead));
-
-	int (*handlers[])(int, int) = {
-		[VARIANT_TYPE0_CLASSIC] = handshake_type0_classic_responder,
-		[VARIANT_TYPE0_PQ]      = handshake_type0_pq_responder,
-		[VARIANT_TYPE3_CLASSIC] = handshake_type3_classic_responder,
-		[VARIANT_TYPE3_PQ]      = handshake_type3_pq_responder,
-		[VARIANT_TYPE3_HYBRID]  = handshake_type3_hybrid_responder,
-	};
-
-	while (1) {
-		uint8_t type, buf[16]; uint32_t len;
-		if (p2p_recv_msg(sockfd, &type, buf, &len, sizeof(buf)) != 0) break;
-		if (type != P2P_MSG_TYPE_SYNC) break;
-
-		int variant_id = buf[0];
-
-		/* Phase switch: P2P done, EAP phase next */
-		if (variant_id == PHASE_SWITCH_SIGNAL) {
-			printf("  P2P phase complete. Switching to EAP...\n");
-			p2p_send_msg(sockfd, P2P_MSG_TYPE_SYNC_ACK, NULL, 0);
-			return 1;
-		}
-
-		/* All done (no EAP phase) */
-		if (variant_id == 0xFF) {
-			printf("  All variants complete.\n");
-			return 0;
-		}
-
-		if (variant_id < 0 || variant_id >= NUM_VARIANTS) {
-			fprintf(stderr, "  ERROR: unknown variant %d\n", variant_id);
-			continue;
-		}
-
-		printf("  [P2P %d/5] %s (Responder)...\n", variant_id + 1,
-		       VARIANT_NAMES[variant_id]);
-
-		if (p2p_send_msg(sockfd, P2P_MSG_TYPE_SYNC_ACK, NULL, 0) != 0) break;
-
-		stack_paint();
-		if (handlers[variant_id](sockfd, variant_id) != 0) {
-			fprintf(stderr, "  ERROR: handshake failed for %s\n",
-			        VARIANT_NAMES[variant_id]);
-		} else {
-			printf("    → avg total: %.2f us, txrx: %.2f us\n",
-			       g_hs_timing[variant_id].total_us,
-			       g_hs_timing[variant_id].txrx_us);
-		}
-		{
-			long scanned = stack_scan();
-			if (scanned > 0)
-				g_hs_overhead[variant_id].memory_bytes = scanned;
-		}
-	}
-
-	return 0;
-}
-
-/* =============================================================================
- * Phase 3: EAP-EDHOC Handshakes (event loop)
- * =============================================================================
- */
-static void run_eap_handshakes(int sockfd)
-{
+	memset(g_eap_transport, 0, sizeof(g_eap_transport));
 	memset(g_aaa_auth, 0, sizeof(g_aaa_auth));
 
 	int (*handlers[])(int, int) = {
@@ -705,7 +602,7 @@ static void run_eap_handshakes(int sockfd)
 			continue;
 		}
 
-		printf("  [EAP %d/5] %s (Responder)...\n", variant_id + 1,
+		printf("  [?/5] %s (EAP Server/Responder)...\n",
 		       VARIANT_NAMES[variant_id]);
 
 		if (p2p_send_msg(sockfd, P2P_MSG_TYPE_SYNC_ACK, NULL, 0) != 0) break;
@@ -720,7 +617,7 @@ static void run_eap_handshakes(int sockfd)
 			       g_hs_timing[variant_id].txrx_us);
 			if (aaa_authenticate_variant(variant_id) != 0) {
 				fprintf(stderr,
-				        "  ERROR: unified AAA auth failed for %s and EDHOC_AAA_REQUIRE=1\n",
+				        "  ERROR: AAA auth failed for %s and EDHOC_AAA_REQUIRE=1\n",
 				        VARIANT_NAMES[variant_id]);
 				break;
 			}
@@ -734,79 +631,74 @@ static void run_eap_handshakes(int sockfd)
 
 	printf("\n  === EAP Transport Stats (Responder) ===\n");
 	print_eap_transport_summary(g_eap_transport);
-	if (g_aaa_enabled) {
-		printf("\n  === AAA Auth Summary (Responder) ===\n");
-		for (int v = 0; v < NUM_VARIANTS; v++) {
-			double avg_ms = (g_aaa_auth[v].attempts > 0)
-				? g_aaa_auth[v].total_auth_ms / g_aaa_auth[v].attempts
-				: 0.0;
-			printf("  %-15s attempts=%d accept=%d reject=%d avg_auth=%.3f ms\n",
-			       VARIANT_NAMES[v],
-			       g_aaa_auth[v].attempts,
-			       g_aaa_auth[v].accepted,
-			       g_aaa_auth[v].rejected,
-			       avg_ms);
-		}
-	}
-}
-
-/* =============================================================================
- * Phase 4: Write ALL CSV files
- * =============================================================================
- */
-static void write_all_csv(void)
-{
-	/* ── Crypto CSV (same data for both P2P and EAP) ── */
-	csv_write_crypto(OUTPUT_DIR "/benchmark_crypto_responder.csv",
-	                 g_crypto_stats, g_crypto_alg_names, g_crypto_op_names,
-	                 g_crypto_count);
-	csv_write_crypto(OUTPUT_DIR "/benchmark_crypto_eap_responder.csv",
-	                 g_crypto_stats, g_crypto_alg_names, g_crypto_op_names,
-	                 g_crypto_count);
-
-	/* ── P2P handshake CSVs (from saved results) ── */
-	csv_write_handshake_ops(OUTPUT_DIR "/benchmark_fullhandshake_operation_p2p_responder.csv",
-	                        "Responder", p2p_saved_ops, P2P_BENCH_HANDSHAKE_ITERATIONS);
-	csv_write_overhead(OUTPUT_DIR "/benchmark_fullhandshake_overhead_p2p_responder.csv",
-	                   "Responder", p2p_saved_overhead);
-	csv_write_processing(OUTPUT_DIR "/benchmark_fullhandshake_processing_p2p_responder.csv",
-	                     "Responder", p2p_saved_timing);
-
-	/* ── EAP handshake CSVs (from current globals) ── */
-	csv_write_handshake_ops(OUTPUT_DIR "/benchmark_fullhandshake_operation_eap_responder.csv",
-	                        "Responder", g_hs_ops, P2P_BENCH_HANDSHAKE_ITERATIONS);
-	csv_write_overhead(OUTPUT_DIR "/benchmark_fullhandshake_overhead_eap_responder.csv",
-	                   "Responder", g_hs_overhead);
-	csv_write_processing(OUTPUT_DIR "/benchmark_fullhandshake_processing_eap_responder.csv",
-	                     "Responder", g_hs_timing);
-
-	/* ── EAP transport CSV ── */
-	csv_write_eap_transport(OUTPUT_DIR "/benchmark_eap_transport_responder.csv",
-	                        g_eap_transport);
-
-	if (g_aaa_enabled) {
-		write_aaa_csv();
-	}
-
-	printf("  Written 9 CSV files (P2P + EAP)%s for Responder.\n",
-	       g_aaa_enabled ? " + AAA summary" : "");
-}
-
-static void write_aaa_csv(void)
-{
-	FILE *fp = fopen(OUTPUT_DIR "/benchmark_aaa_auth_unified_responder.csv", "w");
-	if (!fp) {
-		fprintf(stderr, "ERROR: cannot open %s\n",
-		        OUTPUT_DIR "/benchmark_aaa_auth_unified_responder.csv");
-		return;
-	}
-
-	fprintf(fp, "type,attempts,accepted,rejected,avg_auth_ms,aaa_required,mode\n");
+	printf("\n  === AAA Auth Summary (Responder) ===\n");
 	for (int v = 0; v < NUM_VARIANTS; v++) {
 		double avg_ms = (g_aaa_auth[v].attempts > 0)
 			? g_aaa_auth[v].total_auth_ms / g_aaa_auth[v].attempts
 			: 0.0;
-		fprintf(fp, "%s,%d,%d,%d,%.3f,%d,unified\n",
+		printf("  %-15s attempts=%d accept=%d reject=%d avg_auth=%.3f ms\n",
+		       VARIANT_NAMES[v],
+		       g_aaa_auth[v].attempts,
+		       g_aaa_auth[v].accepted,
+		       g_aaa_auth[v].rejected,
+		       avg_ms);
+	}
+
+}
+
+/* =============================================================================
+ * Phase 3: Write CSV
+ * =============================================================================
+ */
+static void write_all_csv(void)
+{
+	csv_write_crypto(OUTPUT_DIR "/benchmark_crypto_eap_responder.csv",
+	                 g_crypto_stats, g_crypto_alg_names, g_crypto_op_names,
+	                 g_crypto_count);
+
+	csv_write_handshake_ops(OUTPUT_DIR "/benchmark_fullhandshake_operation_eap_responder.csv",
+	                        "Responder", g_hs_ops, P2P_BENCH_HANDSHAKE_ITERATIONS);
+
+	csv_write_overhead(OUTPUT_DIR "/benchmark_fullhandshake_overhead_eap_responder.csv",
+	                   "Responder", g_hs_overhead);
+
+	csv_write_processing(OUTPUT_DIR "/benchmark_fullhandshake_processing_eap_responder.csv",
+	                     "Responder", g_hs_timing);
+
+	csv_write_crypto(OUTPUT_DIR "/benchmark_crypto_eap_aaa_responder.csv",
+	                 g_crypto_stats, g_crypto_alg_names, g_crypto_op_names,
+	                 g_crypto_count);
+
+	csv_write_handshake_ops(OUTPUT_DIR "/benchmark_fullhandshake_operation_eap_aaa_responder.csv",
+	                        "Responder-AAA", g_hs_ops, P2P_BENCH_HANDSHAKE_ITERATIONS);
+
+	csv_write_overhead(OUTPUT_DIR "/benchmark_fullhandshake_overhead_eap_aaa_responder.csv",
+	                   "Responder-AAA", g_hs_overhead);
+
+	csv_write_processing(OUTPUT_DIR "/benchmark_fullhandshake_processing_eap_aaa_responder.csv",
+	                     "Responder-AAA", g_hs_timing);
+
+	csv_write_eap_transport(OUTPUT_DIR "/benchmark_eap_transport_aaa_responder.csv",
+	                        g_eap_transport);
+
+	write_aaa_csv();
+}
+
+static void write_aaa_csv(void)
+{
+	FILE *fp = fopen(OUTPUT_DIR "/benchmark_aaa_auth_responder.csv", "w");
+	if (!fp) {
+		fprintf(stderr, "ERROR: cannot open %s\n",
+		        OUTPUT_DIR "/benchmark_aaa_auth_responder.csv");
+		return;
+	}
+
+	fprintf(fp, "type,attempts,accepted,rejected,avg_auth_ms,aaa_required\n");
+	for (int v = 0; v < NUM_VARIANTS; v++) {
+		double avg_ms = (g_aaa_auth[v].attempts > 0)
+			? g_aaa_auth[v].total_auth_ms / g_aaa_auth[v].attempts
+			: 0.0;
+		fprintf(fp, "%s,%d,%d,%d,%.3f,%d\n",
 		        VARIANT_NAMES[v],
 		        g_aaa_auth[v].attempts,
 		        g_aaa_auth[v].accepted,
@@ -815,6 +707,5 @@ static void write_aaa_csv(void)
 		        g_aaa_required);
 	}
 	fclose(fp);
-	printf("  [CSV] Written: %s\n",
-	       OUTPUT_DIR "/benchmark_aaa_auth_unified_responder.csv");
+	printf("  [CSV] Written: %s\n", OUTPUT_DIR "/benchmark_aaa_auth_responder.csv");
 }

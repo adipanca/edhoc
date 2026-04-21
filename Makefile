@@ -10,7 +10,7 @@
 
 .DEFAULT_GOAL := all
 
-.PHONY: all clean help p2p eap unified p2p-clean eap-clean unified-clean
+.PHONY: all clean help p2p eap unified p2p-clean eap-clean unified-clean aaa-prepare aaa-freeradius
 
 all: p2p eap unified
 
@@ -54,6 +54,12 @@ unified-clean:
 		echo 'Skip Unified clean: Makefile.unified_bench not found.'; \
 	fi
 
+aaa-prepare:
+	@./scripts/freeradius_aaa/prepare.sh
+
+aaa-freeradius:
+	@./scripts/freeradius_aaa/run_debug.sh
+
 help:
 	@echo ''
 	@echo '  Root Build Targets'
@@ -62,6 +68,8 @@ help:
 	@echo '  make p2p          - Build P2P benchmark only'
 	@echo '  make eap          - Build EAP benchmark only'
 	@echo '  make unified      - Build Unified benchmark only'
+	@echo '  make aaa-prepare  - Prepare FreeRADIUS raddb for EDHOC AAA benchmark'
+	@echo '  make aaa-freeradius - Run FreeRADIUS in debug mode with prepared raddb'
 	@echo '  make clean        - Clean all benchmark artifacts'
 	@echo ''
 	@echo '  Run separately:'

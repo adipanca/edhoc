@@ -1,47 +1,47 @@
 type,role,operation,avg_time_us,calls_per_handshake,total_per_handshake_us,iterations
-Type0_classic,Initiator,KeyGen,56.23,1,56.23,100
-Type0_classic,Initiator,Scalar multiplication,168.47,1,168.47,100
-Type0_classic,Initiator,HKDF-EXTRACT,1.58,1,1.58,100
-Type0_classic,Initiator,HKDF-EXPANDS,13.79,5,68.94,100
-Type0_classic,Initiator,HASH,3.39,3,10.17,100
-Type0_classic,Initiator,AEAD_ENCRYPT,0.88,1,0.88,100
+Type0_classic,Initiator,KeyGen,11.91,1,11.91,100
+Type0_classic,Initiator,Scalar multiplication,27.48,1,27.48,100
+Type0_classic,Initiator,HKDF-EXTRACT,0.74,1,0.74,100
+Type0_classic,Initiator,HKDF-EXPANDS,6.28,5,31.38,100
+Type0_classic,Initiator,HASH,1.81,3,5.44,100
+Type0_classic,Initiator,AEAD_ENCRYPT,0.52,1,0.52,100
 Type0_classic,Initiator,AEAD_DECRYPT,0.00,0,0.00,100
-Type0_classic,Initiator,Signature,57.39,1,57.39,100
-Type0_classic,Initiator,Verify,196.20,1,196.20,100
+Type0_classic,Initiator,Signature,12.27,1,12.27,100
+Type0_classic,Initiator,Verify,35.13,1,35.13,100
 
-Type0_PQ,Initiator,KeyGen,370.51,1,370.51,100
+Type0_PQ,Initiator,KeyGen,118.04,1,118.04,100
 Type0_PQ,Initiator,Encaps,0.00,0,0.00,100
-Type0_PQ,Initiator,Decaps,608.92,1,608.92,100
-Type0_PQ,Initiator,HKDF-EXTRACT,2.53,1,2.53,100
-Type0_PQ,Initiator,HKDF-EXPANDS,259.01,5,1295.06,100
-Type0_PQ,Initiator,HASH,60.86,3,182.58,100
-Type0_PQ,Initiator,AEAD_ENCRYPT,7.41,1,7.41,100
+Type0_PQ,Initiator,Decaps,170.10,1,170.10,100
+Type0_PQ,Initiator,HKDF-EXTRACT,1.16,1,1.16,100
+Type0_PQ,Initiator,HKDF-EXPANDS,115.44,5,577.22,100
+Type0_PQ,Initiator,HASH,30.55,3,91.66,100
+Type0_PQ,Initiator,AEAD_ENCRYPT,2.01,1,2.01,100
 Type0_PQ,Initiator,AEAD_DECRYPT,0.00,0,0.00,100
-Type0_PQ,Initiator,Signature,4481.98,1,4481.98,100
-Type0_PQ,Initiator,Verify,941.01,1,941.01,100
+Type0_PQ,Initiator,Signature,1204.03,1,1204.03,100
+Type0_PQ,Initiator,Verify,364.02,1,364.02,100
 
-Type3_Classic,Initiator,KeyGen,56.58,1,56.58,100
-Type3_Classic,Initiator,Scalar multiplication,509.38,3,1528.14,100
-Type3_Classic,Initiator,HKDF-EXTRACT,4.62,3,13.85,100
-Type3_Classic,Initiator,HKDF-EXPANDS,16.08,7,112.56,100
-Type3_Classic,Initiator,HASH,4.05,3,12.14,100
-Type3_Classic,Initiator,AEAD_ENCRYPT,1.00,1,1.00,100
+Type3_Classic,Initiator,KeyGen,12.44,1,12.44,100
+Type3_Classic,Initiator,Scalar multiplication,80.89,3,242.67,100
+Type3_Classic,Initiator,HKDF-EXTRACT,2.12,3,6.37,100
+Type3_Classic,Initiator,HKDF-EXPANDS,6.73,7,47.09,100
+Type3_Classic,Initiator,HASH,1.61,3,4.82,100
+Type3_Classic,Initiator,AEAD_ENCRYPT,0.53,1,0.53,100
 Type3_Classic,Initiator,AEAD_DECRYPT,0.00,0,0.00,100
 
-Type3_PQ,Initiator,KeyGen,536.03,1,536.03,100
-Type3_PQ,Initiator,Encaps,681.29,1,681.29,100
-Type3_PQ,Initiator,Decaps,1761.00,2,3522.01,100
-Type3_PQ,Initiator,HKDF-EXTRACT,9.89,3,29.66,100
-Type3_PQ,Initiator,HKDF-EXPANDS,34.04,7,238.29,100
-Type3_PQ,Initiator,HASH,65.34,4,261.35,100
-Type3_PQ,Initiator,AEAD_ENCRYPT,2.97,2,5.95,100
-Type3_PQ,Initiator,AEAD_DECRYPT,5.41,2,10.82,100
+Type3_PQ,Initiator,KeyGen,117.90,1,117.90,100
+Type3_PQ,Initiator,Encaps,134.51,1,134.51,100
+Type3_PQ,Initiator,Decaps,335.14,2,670.28,100
+Type3_PQ,Initiator,HKDF-EXTRACT,3.34,3,10.01,100
+Type3_PQ,Initiator,HKDF-EXPANDS,10.54,7,73.76,100
+Type3_PQ,Initiator,HASH,21.49,4,85.95,100
+Type3_PQ,Initiator,AEAD_ENCRYPT,0.97,2,1.95,100
+Type3_PQ,Initiator,AEAD_DECRYPT,1.22,2,2.44,100
 
-Type3_Hybrid,Initiator,KeyGen,646.05,1,646.05,100
-Type3_Hybrid,Initiator,Encaps,764.02,3,2292.06,100
-Type3_Hybrid,Initiator,Decaps,928.92,1,928.92,100
-Type3_Hybrid,Initiator,HKDF-EXTRACT,7.64,3,22.93,100
-Type3_Hybrid,Initiator,HKDF-EXPANDS,34.06,8,272.51,100
-Type3_Hybrid,Initiator,HASH,28.68,3,86.03,100
-Type3_Hybrid,Initiator,AEAD_ENCRYPT,1.39,1,1.39,100
-Type3_Hybrid,Initiator,AEAD_DECRYPT,2.46,1,2.46,100
+Type3_Hybrid,Initiator,KeyGen,129.07,1,129.07,100
+Type3_Hybrid,Initiator,Encaps,80.38,3,241.15,100
+Type3_Hybrid,Initiator,Decaps,169.46,1,169.46,100
+Type3_Hybrid,Initiator,HKDF-EXTRACT,2.26,3,6.78,100
+Type3_Hybrid,Initiator,HKDF-EXPANDS,8.73,8,69.87,100
+Type3_Hybrid,Initiator,HASH,8.90,3,26.70,100
+Type3_Hybrid,Initiator,AEAD_ENCRYPT,0.36,1,0.36,100
+Type3_Hybrid,Initiator,AEAD_DECRYPT,0.57,1,0.57,100
