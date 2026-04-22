@@ -14,12 +14,15 @@ LDFLAGS_COMMON := -lsodium -lmbedcrypto -lm
 
 SRC_COMMON := \
 	benchmark.c \
+	eap_wrap.c \
 	edhoc_plaintext.c \
 	pqclean_adapter.c \
 	pqclean_randombytes.c
 
 SRC_INITIATOR := p2p_initiator.c
 SRC_RESPONDER := p2p_responder.c
+SRC_EAP_INITIATOR := p2p_eap_initiator.c
+SRC_EAP_RESPONDER := p2p_eap_responder.c
 
 PQCLEAN_KEM_SRC := $(wildcard $(ROOT)/lib/PQClean/crypto_kem/ml-kem-768/clean/*.c)
 PQCLEAN_SIG_SRC := $(wildcard $(ROOT)/lib/PQClean/crypto_sign/ml-dsa-65/clean/*.c)
@@ -28,16 +31,20 @@ PQCLEAN_COMMON_SRC := \
 	$(ROOT)/lib/PQClean/common/sha2.c \
 	$(ROOT)/lib/PQClean/common/sp800-185.c
 
-SRC_ALL := $(SRC_COMMON) $(SRC_INITIATOR) $(SRC_RESPONDER) $(PQCLEAN_KEM_SRC) $(PQCLEAN_SIG_SRC) $(PQCLEAN_COMMON_SRC)
+SRC_ALL := $(SRC_COMMON) $(SRC_INITIATOR) $(SRC_RESPONDER) $(SRC_EAP_INITIATOR) $(SRC_EAP_RESPONDER) $(PQCLEAN_KEM_SRC) $(PQCLEAN_SIG_SRC) $(PQCLEAN_COMMON_SRC)
 OBJ_ALL := $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC_ALL))
 
 INITIATOR_OBJS := $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC_COMMON) $(SRC_INITIATOR) $(PQCLEAN_KEM_SRC) $(PQCLEAN_SIG_SRC) $(PQCLEAN_COMMON_SRC))
 RESPONDER_OBJS := $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC_COMMON) $(SRC_RESPONDER) $(PQCLEAN_KEM_SRC) $(PQCLEAN_SIG_SRC) $(PQCLEAN_COMMON_SRC))
+EAP_INITIATOR_OBJS := $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC_COMMON) $(SRC_EAP_INITIATOR) $(PQCLEAN_KEM_SRC) $(PQCLEAN_SIG_SRC) $(PQCLEAN_COMMON_SRC))
+EAP_RESPONDER_OBJS := $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC_COMMON) $(SRC_EAP_RESPONDER) $(PQCLEAN_KEM_SRC) $(PQCLEAN_SIG_SRC) $(PQCLEAN_COMMON_SRC))
 
 TARGET_INITIATOR := $(BUILD_DIR)/p2p_initiator
 TARGET_RESPONDER := $(BUILD_DIR)/p2p_responder
+TARGET_EAP_INITIATOR := $(BUILD_DIR)/p2p_eap_initiator
+TARGET_EAP_RESPONDER := $(BUILD_DIR)/p2p_eap_responder
 
-all: $(TARGET_INITIATOR) $(TARGET_RESPONDER)
+all: $(TARGET_INITIATOR) $(TARGET_RESPONDER) $(TARGET_EAP_INITIATOR) $(TARGET_EAP_RESPONDER)
 
 $(TARGET_INITIATOR): $(INITIATOR_OBJS)
 	@mkdir -p $(BUILD_DIR)
@@ -46,6 +53,14 @@ $(TARGET_INITIATOR): $(INITIATOR_OBJS)
 $(TARGET_RESPONDER): $(RESPONDER_OBJS)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(RESPONDER_OBJS) -o $@ $(LDFLAGS_COMMON)
+
+$(TARGET_EAP_INITIATOR): $(EAP_INITIATOR_OBJS)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(EAP_INITIATOR_OBJS) -o $@ $(LDFLAGS_COMMON)
+
+$(TARGET_EAP_RESPONDER): $(EAP_RESPONDER_OBJS)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(EAP_RESPONDER_OBJS) -o $@ $(LDFLAGS_COMMON)
 
 $(OBJ_DIR)/%.o: %.c
 	@mkdir -p $(dir $@)
@@ -64,6 +79,6 @@ $(OBJ_DIR)/$(ROOT)/lib/PQClean/common/%.o: $(ROOT)/lib/PQClean/common/%.c
 	$(CC) $(CFLAGS_COMMON) -O0 -c $< -o $@
 
 clean:
-	rm -rf $(OBJ_DIR) $(TARGET_INITIATOR) $(TARGET_RESPONDER)
+	rm -rf $(OBJ_DIR) $(TARGET_INITIATOR) $(TARGET_RESPONDER) $(TARGET_EAP_INITIATOR) $(TARGET_EAP_RESPONDER)
 
 .PHONY: all clean

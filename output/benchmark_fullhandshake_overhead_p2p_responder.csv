@@ -1,6 +1,6 @@
-type,role,cpu_time_us,cpu_usage_percentage,memory_bytes,memory_us
-Section2,Responder,4963.25,2.57,2695168,0.00
-Section32,Responder,17678.98,7.74,2695168,0.00
-Section33,Responder,7736.96,3.14,2695168,0.00
-Section34,Responder,6856.35,1.73,2695168,0.00
-Section35,Responder,7637.81,2.12,2695168,0.00
+type,role,cpu_time_us,wall_time_us,cpu_to_wall_ratio,protocol_state_est_bytes,rss_peak_bytes,crypto_time_est_us,io_wait_us,residual_overhead_us
+Section2,Responder,5136.76,184262.34,0.027877,14885,2699264,4852.74,75247.72,104161.87
+Section32,Responder,9634.52,159107.39,0.060554,22194,2699264,9367.87,71361.89,78377.63
+Section33,Responder,10720.42,332155.09,0.032275,22322,2699264,10059.99,170306.26,151788.85
+Section34,Responder,5581.33,332689.25,0.016776,17349,2699264,5008.11,149833.57,177847.56
+Section35,Responder,13597.31,316047.44,0.043023,24658,2699264,13019.70,140970.25,162057.48

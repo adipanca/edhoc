@@ -60,9 +60,13 @@ struct timing_accum {
 
 struct overhead_accum {
     double cpu_time_us[SECTION_COUNT];
-    double cpu_usage_percentage[SECTION_COUNT];
-    uint64_t memory_bytes[SECTION_COUNT];
-    double memory_us[SECTION_COUNT];
+    double wall_time_us[SECTION_COUNT];
+    double cpu_to_wall_ratio[SECTION_COUNT];
+    uint64_t protocol_state_bytes[SECTION_COUNT];
+    uint64_t rss_peak_bytes[SECTION_COUNT];
+    double crypto_time_est_us[SECTION_COUNT];
+    double io_wait_us[SECTION_COUNT];
+    double residual_overhead_us[SECTION_COUNT];
 };
 
 struct basic_stats {
@@ -113,5 +117,12 @@ int write_overhead_csv(const char *path, const char *role,
                        const struct overhead_accum *overhead);
 int write_processing_csv(const char *path, const char *role,
                          const struct timing_accum *timing);
+
+uint64_t estimate_protocol_state_bytes(const struct role_stats *stats,
+                                       int section,
+                                       int iterations);
+double estimate_crypto_time_us(const struct role_stats *stats,
+                               int section,
+                               int iterations);
 
 #endif

@@ -1,6 +1,6 @@
-type,role,cpu_time_us,cpu_usage_percentage,memory_bytes,memory_us
-Section2,Initiator,7963.85,4.79,2740224,0.00
-Section32,Initiator,12721.02,6.35,2740224,0.00
-Section33,Initiator,6957.52,1.94,2740224,0.00
-Section34,Initiator,8186.15,2.25,2740224,0.00
-Section35,Initiator,14472.04,4.06,2740224,0.00
+type,role,cpu_time_us,wall_time_us,cpu_to_wall_ratio,protocol_state_est_bytes,rss_peak_bytes,crypto_time_est_us,io_wait_us,residual_overhead_us
+Section2,Initiator,10120.69,179835.25,0.056278,16965,2707456,9863.91,95308.23,74663.11
+Section32,Initiator,11969.06,157119.06,0.076178,22194,2707456,11692.20,67048.32,78378.54
+Section33,Initiator,13699.95,350128.59,0.039128,22322,2707456,13140.49,149153.93,187834.18
+Section34,Initiator,9141.79,328943.81,0.027791,19429,2707456,8563.98,165715.11,154664.71
+Section35,Initiator,12540.28,309467.77,0.040522,24658,2707456,11983.93,143750.27,153733.57

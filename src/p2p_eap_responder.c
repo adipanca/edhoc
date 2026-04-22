@@ -1,4 +1,5 @@
 #include "benchmark.h"
+#include "eap_wrap.h"
 #include "edhoc_plaintext.h"
 #include "pqclean_adapter.h"
 
@@ -13,6 +14,38 @@
 #include <unistd.h>
 
 #define CRED_EXCHANGE_TYPE 0xF0
+#define EAP_MTU_DEFAULT 256
+#define EAP_METHOD_TYPE_EXPERIMENTAL 57
+
+static struct eap_wrap_ctx g_eap;
+
+static int send_wrapped_frame(int sockfd, uint8_t type, const uint8_t *payload, uint32_t len, double *txrx_us)
+{
+    return eap_send_wrapped_frame(&g_eap, sockfd, type, payload, len, txrx_us);
+}
+
+static int recv_wrapped_frame(int sockfd, uint8_t *type, uint8_t *payload, uint32_t cap, uint32_t *len, double *txrx_us)
+{
+    return eap_recv_wrapped_frame(&g_eap, sockfd, type, payload, cap, len, txrx_us);
+}
+
+static int send_wrapped_frame_ex(int sockfd, uint8_t type,
+                                 const uint8_t *payload, uint32_t len,
+                                 double *txrx_us,
+                                 uint32_t *frags,
+                                 uint32_t *wire_bytes)
+{
+    return eap_send_wrapped_frame_ex(&g_eap, sockfd, type, payload, len, txrx_us, frags, wire_bytes);
+}
+
+static int recv_wrapped_frame_ex(int sockfd, uint8_t *type,
+                                 uint8_t *payload, uint32_t cap, uint32_t *len,
+                                 double *txrx_us,
+                                 uint32_t *frags,
+                                 uint32_t *wire_bytes)
+{
+    return eap_recv_wrapped_frame_ex(&g_eap, sockfd, type, payload, cap, len, txrx_us, frags, wire_bytes);
+}
 
 struct local_identity {
     uint8_t sig_pk[MLDSA65_PK_LEN];
@@ -113,6 +146,125 @@ static void compute_id_cred_kem(const uint8_t *kem_pk, uint8_t out[ID_CRED_LEN])
     crypto_hash_sha256(out, kem_pk, MLKEM768_PK_LEN);
 }
 
+static void hex64(const uint8_t in[64], char out[129])
+{
+    static const char *h = "0123456789abcdef";
+    for (int i = 0; i < 64; i++) {
+        out[2 * i] = h[(in[i] >> 4) & 0xF];
+        out[2 * i + 1] = h[in[i] & 0xF];
+    }
+    out[128] = '\0';
+}
+
+static void derive_msk_emsk(const uint8_t prk[32], uint8_t msk[64], uint8_t emsk[64])
+{
+    static const uint8_t info_msk[] = "EAP-EDHOC-MSK";
+    static const uint8_t info_emsk[] = "EAP-EDHOC-EMSK";
+
+    hkdf_expand_sha256(prk, info_msk, sizeof(info_msk) - 1, msk, 64);
+    hkdf_expand_sha256(prk, info_emsk, sizeof(info_emsk) - 1, emsk, 64);
+}
+
+static int write_eap_keymat_csv(const char *path,
+                                const uint8_t msk[SECTION_COUNT][64],
+                                const uint8_t emsk[SECTION_COUNT][64])
+{
+    FILE *fp = fopen(path, "w");
+    if (!fp) return -1;
+
+    fprintf(fp, "section,msk,emsk\n");
+    for (int s = 0; s < SECTION_COUNT; s++) {
+        char msk_hex[129], emsk_hex[129];
+        hex64(msk[s], msk_hex);
+        hex64(emsk[s], emsk_hex);
+        fprintf(fp, "%s,%s,%s\n", SECTION_NAMES[s], msk_hex, emsk_hex);
+    }
+
+    fclose(fp);
+    return 0;
+}
+
+struct frag_accum {
+    double msg_bytes_sum[4];
+    double msg_wire_sum[4];
+    double msg_frags_sum[4];
+    double msg_count[4];
+    double ack_frags_sum;
+    double ack_wire_sum;
+};
+
+static int write_fragmentation_csv(const char *path,
+                                   const struct frag_accum acc[SECTION_COUNT],
+                                   const struct role_stats *op_stats,
+                                   int iterations,
+                                   int mtu)
+{
+    FILE *fp = fopen(path, "w");
+    if (!fp) return -1;
+
+    fprintf(fp, "section,mtu,msg1_bytes,msg1_wire,msg1_frags,msg2_bytes,msg2_wire,msg2_frags,msg3_bytes,msg3_wire,msg3_frags,msg4_bytes,msg4_wire,msg4_frags,ack_msg4_wire,ack_msg4_frags,total_fragments,tx_fragments,rx_fragments,total_wire_bytes,total_rt,num_sign,num_verify,num_encaps,num_decaps\n");
+
+    for (int s = 0; s < SECTION_COUNT; s++) {
+        double b[4] = {0}, w[4] = {0}, f[4] = {0};
+        double total_f = 0;
+        double tx_f = 0;
+        double rx_f = 0;
+        double total_w = 0;
+        double ack_frags = 0;
+        double ack_wire = 0;
+        int total_rt = (s == SECTION33 || s == SECTION34 || s == SECTION35) ? 4 : 3;
+
+        for (int m = 0; m < 4; m++) {
+            if (acc[s].msg_count[m] > 0.0) {
+                b[m] = acc[s].msg_bytes_sum[m] / acc[s].msg_count[m];
+                w[m] = acc[s].msg_wire_sum[m] / acc[s].msg_count[m];
+                f[m] = acc[s].msg_frags_sum[m] / acc[s].msg_count[m];
+                total_f += f[m];
+                total_w += w[m];
+            }
+        }
+
+        if (s == SECTION33 || s == SECTION34 || s == SECTION35) {
+            ack_frags = acc[s].ack_frags_sum / (double)iterations;
+            ack_wire = acc[s].ack_wire_sum / (double)iterations;
+            total_f += ack_frags;
+            total_w += ack_wire;
+        }
+
+        tx_f = f[1] + f[3];
+        rx_f = f[0] + f[2] + ack_frags;
+
+        {
+            double num_sign = (double)op_stats->by_section[s][OP_SIGNATURE].calls / (double)iterations;
+            double num_verify = (double)op_stats->by_section[s][OP_VERIFY].calls / (double)iterations;
+            double num_encaps = (double)op_stats->by_section[s][OP_ENCAPS].calls / (double)iterations;
+            double num_decaps = (double)op_stats->by_section[s][OP_DECAPS].calls / (double)iterations;
+
+            fprintf(fp,
+                    "%s,%d,%.0f,%.0f,%.2f,%.0f,%.0f,%.2f,%.0f,%.0f,%.2f,%.0f,%.0f,%.2f,%.0f,%.2f,%.2f,%.2f,%.2f,%.0f,%d,%.2f,%.2f,%.2f,%.2f\n",
+                    SECTION_NAMES[s], mtu,
+                    b[0], w[0], f[0],
+                    b[1], w[1], f[1],
+                    b[2], w[2], f[2],
+                    b[3], w[3], f[3],
+                    ack_wire,
+                    ack_frags,
+                    total_f,
+                    tx_f,
+                    rx_f,
+                    total_w,
+                    total_rt,
+                    num_sign,
+                    num_verify,
+                    num_encaps,
+                    num_decaps);
+        }
+    }
+
+    fclose(fp);
+    return 0;
+}
+
 static void timed_hkdf_expand_len(struct role_stats *s, int sec,
                                   const uint8_t prk[32],
                                   const uint8_t *info, size_t info_len,
@@ -164,6 +316,9 @@ static int section_run_responder(int sockfd, int sec,
                                  struct overhead_accum *ov,
                                  const struct local_identity *me,
                                  const struct peer_identity *peer,
+                                 uint8_t out_msk[64],
+                                 uint8_t out_emsk[64],
+                                 struct frag_accum *frag,
                                  int iterations)
 {
     uint8_t id_r_sign[ID_CRED_LEN], id_r_kem[ID_CRED_LEN];
@@ -191,6 +346,10 @@ static int section_run_responder(int sockfd, int sec,
         uint8_t type = 0;
         uint8_t recv_buf[9000];
         uint32_t recv_len = 0;
+        uint8_t prk_export[32] = {0};
+        int has_prk_export = 0;
+        uint32_t frame_frags = 0;
+        uint32_t frame_wire = 0;
 
         double txrx_us = 0;
         double wall0 = now_us();
@@ -208,8 +367,12 @@ static int section_run_responder(int sockfd, int sec,
         double pre1 = now_us();
         total_precomp += (pre1 - pre0);
 
-        if (recv_frame(sockfd, &type, recv_buf, sizeof(recv_buf), &recv_len, &txrx_us) != 0) return -1;
+        if (recv_wrapped_frame_ex(sockfd, &type, recv_buf, sizeof(recv_buf), &recv_len, &txrx_us, &frame_frags, &frame_wire) != 0) return -1;
         if (type != MSG_TYPE_1) return -1;
+        frag->msg_bytes_sum[0] += (double)recv_len;
+        frag->msg_wire_sum[0] += (double)frame_wire;
+        frag->msg_frags_sum[0] += (double)frame_frags;
+        frag->msg_count[0] += 1.0;
 
         uint32_t off = 0;
         uint8_t pk_eph_i[MLKEM768_PK_LEN];
@@ -244,6 +407,8 @@ static int section_run_responder(int sockfd, int sec,
             uint8_t ctx2[1 + ID_CRED_LEN + 32], mac2[MAC_LEN];
             timed_kdf_label(ops, sec, prk2e, 1, th2, 32, salt3e2m, 32);
             timed_hkdf_extract(ops, sec, salt3e2m, 32, ss_r, MLKEM768_SS_LEN, prk3e2m);
+            memcpy(prk_export, prk3e2m, 32);
+            has_prk_export = 1;
 
             ctx2[0] = c_r;
             memcpy(ctx2 + 1, id_r, ID_CRED_LEN);
@@ -289,10 +454,18 @@ static int section_run_responder(int sockfd, int sec,
         memcpy(payload2 + payload2_len, c2, pt2a_len);
         payload2_len += (uint32_t)pt2a_len;
 
-        if (send_frame(sockfd, MSG_TYPE_2, payload2, payload2_len, &txrx_us) != 0) return -1;
+        if (send_wrapped_frame_ex(sockfd, MSG_TYPE_2, payload2, payload2_len, &txrx_us, &frame_frags, &frame_wire) != 0) return -1;
+        frag->msg_bytes_sum[1] += (double)payload2_len;
+        frag->msg_wire_sum[1] += (double)frame_wire;
+        frag->msg_frags_sum[1] += (double)frame_frags;
+        frag->msg_count[1] += 1.0;
 
-        if (recv_frame(sockfd, &type, recv_buf, sizeof(recv_buf), &recv_len, &txrx_us) != 0) return -1;
+        if (recv_wrapped_frame_ex(sockfd, &type, recv_buf, sizeof(recv_buf), &recv_len, &txrx_us, &frame_frags, &frame_wire) != 0) return -1;
         if (type != MSG_TYPE_3) return -1;
+        frag->msg_bytes_sum[2] += (double)recv_len;
+        frag->msg_wire_sum[2] += (double)frame_wire;
+        frag->msg_frags_sum[2] += (double)frame_frags;
+        frag->msg_count[2] += 1.0;
 
         if (sec == SECTION2) {
             off = 0;
@@ -304,9 +477,13 @@ static int section_run_responder(int sockfd, int sec,
             record_op(ops, sec, OP_DECAPS, t1 - t0);
             timed_kdf_label(ops, sec, prk2e, 1, th2, 32, salt3e2m, 32);
             timed_hkdf_extract(ops, sec, salt3e2m, 32, ss_r2, MLKEM768_SS_LEN, prk3e2m);
+            memcpy(prk_export, prk3e2m, 32);
+            has_prk_export = 1;
             off = MLKEM768_CT_LEN;
         } else {
             memcpy(prk3e2m, prk2e, 32);
+            memcpy(prk_export, prk3e2m, 32);
+            has_prk_export = 1;
             off = 0;
         }
 
@@ -385,6 +562,8 @@ static int section_run_responder(int sockfd, int sec,
 
             timed_kdf_label(ops, sec, prk3e2m, 5, th4, 32, salt4, 32);
             timed_hkdf_extract(ops, sec, salt4, 32, ss_i, MLKEM768_SS_LEN, prk4);
+            memcpy(prk_export, prk4, 32);
+            has_prk_export = 1;
             timed_kdf_label(ops, sec, prk4, 8, th4, 32, k4, sizeof(k4));
             timed_kdf_label(ops, sec, prk4, 9, th4, 32, iv4, sizeof(iv4));
 
@@ -402,7 +581,21 @@ static int section_run_responder(int sockfd, int sec,
             }
 
             memcpy(msg4, ct_i, MLKEM768_CT_LEN);
-            if (send_frame(sockfd, MSG_TYPE_4, msg4, (uint32_t)(MLKEM768_CT_LEN + ct4_len), &txrx_us) != 0) return -1;
+            if (send_wrapped_frame_ex(sockfd, MSG_TYPE_4, msg4, (uint32_t)(MLKEM768_CT_LEN + ct4_len), &txrx_us, &frame_frags, &frame_wire) != 0) return -1;
+            frag->msg_bytes_sum[3] += (double)(MLKEM768_CT_LEN + ct4_len);
+            frag->msg_wire_sum[3] += (double)frame_wire;
+            frag->msg_frags_sum[3] += (double)frame_frags;
+            frag->msg_count[3] += 1.0;
+
+            {
+                uint8_t ack_type = 0;
+                uint8_t ack_payload[1];
+                uint32_t ack_len = 0;
+                if (recv_wrapped_frame_ex(sockfd, &ack_type, ack_payload, sizeof(ack_payload), &ack_len, &txrx_us, &frame_frags, &frame_wire) != 0) return -1;
+                if (ack_type != MSG_TYPE_4 || ack_len != 0) return -1;
+                frag->ack_frags_sum += (double)frame_frags;
+                frag->ack_wire_sum += (double)frame_wire;
+            }
         }
 
         double wall1 = now_us();
@@ -413,6 +606,10 @@ static int section_run_responder(int sockfd, int sec,
         total_wall += (wall1 - wall0);
         total_txrx += txrx_us;
         total_cpu += (cpu1 - cpu0);
+
+        if (it == 0 && has_prk_export) {
+            derive_msk_emsk(prk_export, out_msk, out_emsk);
+        }
     }
 
     timing->total_us[sec] = total_wall / iterations;
@@ -506,6 +703,8 @@ int main(int argc, char **argv)
     int port = (argc > 1) ? atoi(argv[1]) : 9000;
     int iterations = (argc > 2) ? atoi(argv[2]) : 50;
     int crypto_iterations = (argc > 3) ? atoi(argv[3]) : 300;
+    int eap_mtu = (argc > 4) ? atoi(argv[4]) : EAP_MTU_DEFAULT;
+    int eap_method_type = (argc > 5) ? atoi(argv[5]) : EAP_METHOD_TYPE_EXPERIMENTAL;
 
     if (sodium_init() < 0) {
         fprintf(stderr, "sodium_init failed\n");
@@ -520,6 +719,12 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    if (eap_wrap_init(&g_eap, EAP_WRAP_RESPONDER, (uint8_t)eap_method_type, (uint16_t)eap_mtu) != 0) {
+        fprintf(stderr, "invalid EAP settings (mtu/method)\n");
+        close(sockfd);
+        return 1;
+    }
+
     struct local_identity me;
     struct peer_identity peer;
     pq_mldsa65_keygen(me.sig_pk, me.sig_sk);
@@ -530,7 +735,11 @@ int main(int argc, char **argv)
     uint8_t recv_buf[4096];
     uint32_t recv_len = 0;
 
-    if (recv_frame(sockfd, &type, recv_buf, sizeof(recv_buf), &recv_len, &dummy) != 0) return 1;
+    if (eap_send_identity_request(&g_eap, sockfd, &dummy) != 0) return 1;
+    if (eap_expect_identity_response(&g_eap, sockfd, &dummy) != 0) return 1;
+    if (eap_send_start(&g_eap, sockfd, &dummy) != 0) return 1;
+
+    if (recv_wrapped_frame(sockfd, &type, recv_buf, sizeof(recv_buf), &recv_len, &dummy) != 0) return 1;
     if (type != CRED_EXCHANGE_TYPE) return 1;
 
     size_t off = 0;
@@ -545,21 +754,32 @@ int main(int argc, char **argv)
     memcpy(cred_payload + cred_len, me.kem_pk, MLKEM768_PK_LEN);
     cred_len += MLKEM768_PK_LEN;
 
-    if (send_frame(sockfd, CRED_EXCHANGE_TYPE, cred_payload, (uint32_t)cred_len, &dummy) != 0) return 1;
+    if (send_wrapped_frame(sockfd, CRED_EXCHANGE_TYPE, cred_payload, (uint32_t)cred_len, &dummy) != 0) return 1;
 
     struct role_stats op_stats;
     struct timing_accum timing;
     struct overhead_accum overhead;
+    struct frag_accum frag_stats[SECTION_COUNT];
+    uint8_t msk[SECTION_COUNT][64];
+    uint8_t emsk[SECTION_COUNT][64];
     memset(&op_stats, 0, sizeof(op_stats));
     memset(&timing, 0, sizeof(timing));
     memset(&overhead, 0, sizeof(overhead));
+    memset(frag_stats, 0, sizeof(frag_stats));
+    memset(msk, 0, sizeof(msk));
+    memset(emsk, 0, sizeof(emsk));
 
     for (int sec = 0; sec < SECTION_COUNT; sec++) {
-        if (section_run_responder(sockfd, sec, &op_stats, &timing, &overhead, &me, &peer, iterations) != 0) {
+        if (section_run_responder(sockfd, sec, &op_stats, &timing, &overhead, &me, &peer, msk[sec], emsk[sec], &frag_stats[sec], iterations) != 0) {
             fprintf(stderr, "section %s failed\n", SECTION_NAMES[sec]);
             close(sockfd);
             return 1;
         }
+    }
+
+    if (eap_send_success(&g_eap, sockfd, &dummy) != 0) {
+        close(sockfd);
+        return 1;
     }
 
     struct crypto_row rows[16];
@@ -569,10 +789,12 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    write_crypto_csv("output/benchmark_crypto_responder.csv", rows, nrows);
-    write_operation_csv("output/benchmark_fullhandshake_operation_p2p_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &op_stats, iterations);
-    write_overhead_csv("output/benchmark_fullhandshake_overhead_p2p_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &overhead);
-    write_processing_csv("output/benchmark_fullhandshake_processing_p2p_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &timing);
+    write_crypto_csv("output/benchmark_crypto_eap_responder.csv", rows, nrows);
+    write_operation_csv("output/benchmark_fullhandshake_operation_p2p_eap_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &op_stats, iterations);
+    write_overhead_csv("output/benchmark_fullhandshake_overhead_p2p_eap_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &overhead);
+    write_processing_csv("output/benchmark_fullhandshake_processing_p2p_eap_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &timing);
+    write_eap_keymat_csv("output/benchmark_eap_keymat_responder.csv", msk, emsk);
+    write_fragmentation_csv("output/benchmark_fragmentation_eap_responder.csv", frag_stats, &op_stats, iterations, eap_mtu);
 
     close(sockfd);
     return 0;

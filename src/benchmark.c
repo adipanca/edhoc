@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include "benchmark.h"
+#include "pqclean_adapter.h"
 
 #include <arpa/inet.h>
 #include <math.h>
@@ -287,19 +288,63 @@ int write_overhead_csv(const char *path, const char *role,
     FILE *fp = fopen(path, "w");
     if (!fp) return -1;
 
-    fprintf(fp, "type,role,cpu_time_us,cpu_usage_percentage,memory_bytes,memory_us\n");
+    fprintf(fp, "type,role,cpu_time_us,wall_time_us,cpu_to_wall_ratio,protocol_state_est_bytes,rss_peak_bytes,crypto_time_est_us,io_wait_us,residual_overhead_us\n");
     for (int s = 0; s < SECTION_COUNT; s++) {
-        fprintf(fp, "%s,%s,%.2f,%.2f,%llu,%.2f\n",
+        fprintf(fp, "%s,%s,%.2f,%.2f,%.6f,%llu,%llu,%.2f,%.2f,%.2f\n",
                 SECTION_NAMES[s],
                 role,
                 overhead->cpu_time_us[s],
-                overhead->cpu_usage_percentage[s],
-                (unsigned long long)overhead->memory_bytes[s],
-                overhead->memory_us[s]);
+                overhead->wall_time_us[s],
+                overhead->cpu_to_wall_ratio[s],
+                (unsigned long long)overhead->protocol_state_bytes[s],
+                (unsigned long long)overhead->rss_peak_bytes[s],
+                overhead->crypto_time_est_us[s],
+                overhead->io_wait_us[s],
+                overhead->residual_overhead_us[s]);
     }
 
     fclose(fp);
     return 0;
+}
+
+uint64_t estimate_protocol_state_bytes(const struct role_stats *stats,
+                                       int section,
+                                       int iterations)
+{
+    double iters = (iterations > 0) ? (double)iterations : 1.0;
+    double c_keygen = (double)stats->by_section[section][OP_KEYGEN].calls / iters;
+    double c_encaps = (double)stats->by_section[section][OP_ENCAPS].calls / iters;
+    double c_decaps = (double)stats->by_section[section][OP_DECAPS].calls / iters;
+    double c_sign = (double)stats->by_section[section][OP_SIGNATURE].calls / iters;
+    double c_verify = (double)stats->by_section[section][OP_VERIFY].calls / iters;
+    double c_hash = (double)stats->by_section[section][OP_HASH].calls / iters;
+    double c_hkdf = ((double)stats->by_section[section][OP_HKDF_EXTRACT].calls +
+                     (double)stats->by_section[section][OP_HKDF_EXPAND].calls) /
+                    iters;
+
+    /* Estimate protocol working-set bytes from key and transcript artifacts. */
+    uint64_t base_bytes = 2048 + (8 * SHA256_LEN) + (2 * AES_KEY_LEN) + (2 * AES_IV_LEN);
+    uint64_t kem_bytes = (uint64_t)((c_keygen + c_encaps + c_decaps) *
+                                    (double)(MLKEM768_PK_LEN + MLKEM768_CT_LEN + MLKEM768_SS_LEN));
+    uint64_t sig_bytes = (uint64_t)((c_sign * (double)(MLDSA65_SK_LEN + MLDSA65_SIG_MAX_LEN)) +
+                                    (c_verify * (double)(MLDSA65_PK_LEN + MLDSA65_SIG_MAX_LEN)));
+    uint64_t digest_bytes = (uint64_t)((c_hash + c_hkdf) * (double)SHA256_LEN);
+
+    return base_bytes + kem_bytes + sig_bytes + digest_bytes;
+}
+
+double estimate_crypto_time_us(const struct role_stats *stats,
+                               int section,
+                               int iterations)
+{
+    double iters = (iterations > 0) ? (double)iterations : 1.0;
+    double sum = 0.0;
+
+    for (int op = 0; op < OP_COUNT; op++) {
+        sum += stats->by_section[section][op].sum_us;
+    }
+
+    return sum / iters;
 }
 
 int write_processing_csv(const char *path, const char *role,
