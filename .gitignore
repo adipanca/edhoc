@@ -11,5 +11,3 @@ build/
 *~
 .vscode/
 
-# Runtime FreeRADIUS AAA overlay data
-output/freeradius_aaa/
