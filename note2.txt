@@ -350,3 +350,5 @@ sequenceDiagram
     Note over I: === Finalize ===<br/>1. Parse (kem.ct_I, CIPHERTEXT_4)<br/>2. ss_I = ML-KEM.Decaps(kem.ct_I, kem.sk_I)<br/>3. Compute TH_4, SALT_4e3m, PRK_4e3m, K_4, IV_4<br/>4. Decrypt CIPHERTEXT_4 → EAD_4<br/>5. PRK_out = EDHOC_KDF(PRK_4e3m, 7, TH_4, hlen)
 
     Note over I,R: === AKE Complete: both parties share PRK_out ===
+
+    
