@@ -17,6 +17,76 @@
 #define EAP_MTU_DEFAULT 256
 #define EAP_METHOD_TYPE_EXPERIMENTAL 57
 
+#ifndef BENCH_TAG
+#define BENCH_TAG ""
+#endif
+
+#ifdef BENCH_AAA
+#include "aaa_radius.h"
+struct aaa_accum {
+    double rtt_us_sum[SECTION_COUNT];
+    double req_bytes_sum[SECTION_COUNT];
+    double resp_bytes_sum[SECTION_COUNT];
+    uint64_t count[SECTION_COUNT];
+    uint64_t accept[SECTION_COUNT];
+    uint64_t reject[SECTION_COUNT];
+    uint64_t err[SECTION_COUNT];
+};
+static struct aaa_accum g_aaa;
+static const char *g_aaa_host = "127.0.0.1";
+static uint16_t g_aaa_port = 3812;
+static const char *g_aaa_secret = "testing123";
+static const char *g_aaa_password = "edhoc-pass";
+static const char *g_aaa_user_for_section[SECTION_COUNT] = {
+    "edhoc_Section2",
+    "edhoc_Section32",
+    "edhoc_Section33",
+    "edhoc_Section34",
+    "edhoc_Section35"
+};
+static void aaa_tick(int sec)
+{
+    double rtt = 0; size_t rb = 0, sb = 0;
+    int code = aaa_radius_pap_auth(g_aaa_host, g_aaa_port, g_aaa_secret,
+                                   g_aaa_user_for_section[sec], g_aaa_password,
+                                   &rtt, &rb, &sb);
+    if (code <= 0) {
+        g_aaa.err[sec] += 1;
+        return;
+    }
+    g_aaa.rtt_us_sum[sec] += rtt;
+    g_aaa.req_bytes_sum[sec] += (double)rb;
+    g_aaa.resp_bytes_sum[sec] += (double)sb;
+    g_aaa.count[sec] += 1;
+    if (code == 2) g_aaa.accept[sec] += 1;
+    else if (code == 3) g_aaa.reject[sec] += 1;
+}
+static int write_aaa_csv(const char *path)
+{
+    FILE *f = fopen(path, "w");
+    if (!f) return -1;
+    fprintf(f, "section,calls,accepts,rejects,errors,rtt_avg_us,req_bytes_avg,resp_bytes_avg,total_bytes_avg\n");
+    for (int s = 0; s < SECTION_COUNT; s++) {
+        double n = (double)(g_aaa.count[s] ? g_aaa.count[s] : 1);
+        fprintf(f, "%s,%llu,%llu,%llu,%llu,%.3f,%.1f,%.1f,%.1f\n",
+                SECTION_NAMES[s],
+                (unsigned long long)g_aaa.count[s],
+                (unsigned long long)g_aaa.accept[s],
+                (unsigned long long)g_aaa.reject[s],
+                (unsigned long long)g_aaa.err[s],
+                g_aaa.rtt_us_sum[s] / n,
+                g_aaa.req_bytes_sum[s] / n,
+                g_aaa.resp_bytes_sum[s] / n,
+                (g_aaa.req_bytes_sum[s] + g_aaa.resp_bytes_sum[s]) / n);
+    }
+    fclose(f);
+    return 0;
+}
+#define BENCH_AAA_TICK(sec) aaa_tick(sec)
+#else
+#define BENCH_AAA_TICK(sec) ((void)0)
+#endif
+
 static struct eap_wrap_ctx g_eap;
 
 static int send_wrapped_frame(int sockfd, uint8_t type, const uint8_t *payload, uint32_t len, double *txrx_us)
@@ -610,6 +680,8 @@ static int section_run_responder(int sockfd, int sec,
         if (it == 0 && has_prk_export) {
             derive_msk_emsk(prk_export, out_msk, out_emsk);
         }
+
+        BENCH_AAA_TICK(sec);
     }
 
     timing->total_us[sec] = total_wall / iterations;
@@ -705,6 +777,11 @@ int main(int argc, char **argv)
     int crypto_iterations = (argc > 3) ? atoi(argv[3]) : 300;
     int eap_mtu = (argc > 4) ? atoi(argv[4]) : EAP_MTU_DEFAULT;
     int eap_method_type = (argc > 5) ? atoi(argv[5]) : EAP_METHOD_TYPE_EXPERIMENTAL;
+#ifdef BENCH_AAA
+    if (argc > 6) g_aaa_host = argv[6];
+    if (argc > 7) g_aaa_port = (uint16_t)atoi(argv[7]);
+    if (argc > 8) g_aaa_secret = argv[8];
+#endif
 
     if (sodium_init() < 0) {
         fprintf(stderr, "sodium_init failed\n");
@@ -789,12 +866,15 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    write_crypto_csv("output/benchmark_crypto_eap_responder.csv", rows, nrows);
-    write_operation_csv("output/benchmark_fullhandshake_operation_p2p_eap_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &op_stats, iterations);
-    write_overhead_csv("output/benchmark_fullhandshake_overhead_p2p_eap_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &overhead);
-    write_processing_csv("output/benchmark_fullhandshake_processing_p2p_eap_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &timing);
-    write_eap_keymat_csv("output/benchmark_eap_keymat_responder.csv", msk, emsk);
-    write_fragmentation_csv("output/benchmark_fragmentation_eap_responder.csv", frag_stats, &op_stats, iterations, eap_mtu);
+    write_crypto_csv("output/benchmark_crypto_eap" BENCH_TAG "_responder.csv", rows, nrows);
+    write_operation_csv("output/benchmark_fullhandshake_operation_p2p_eap" BENCH_TAG "_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &op_stats, iterations);
+    write_overhead_csv("output/benchmark_fullhandshake_overhead_p2p_eap" BENCH_TAG "_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &overhead);
+    write_processing_csv("output/benchmark_fullhandshake_processing_p2p_eap" BENCH_TAG "_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &timing);
+    write_eap_keymat_csv("output/benchmark_eap_keymat" BENCH_TAG "_responder.csv", msk, emsk);
+    write_fragmentation_csv("output/benchmark_fragmentation_eap" BENCH_TAG "_responder.csv", frag_stats, &op_stats, iterations, eap_mtu);
+#ifdef BENCH_AAA
+    write_aaa_csv("output/benchmark_aaa_auth_p2p_eap_aaa_responder.csv");
+#endif
 
     close(sockfd);
     return 0;

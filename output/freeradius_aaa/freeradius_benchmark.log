@@ -1,0 +1,17 @@
+Wed Apr 22 14:24:41 2026 : Info: Starting - reading configuration files ...
+Wed Apr 22 14:24:41 2026 : Info: Debug state unknown (cap_sys_ptrace capability not set)
+Wed Apr 22 14:24:41 2026 : Info: systemd watchdog is disabled
+Wed Apr 22 14:24:41 2026 : Info: Loaded virtual server <default>
+Wed Apr 22 14:24:41 2026 : Warning: Ignoring "sql" (see raddb/mods-available/README.rst)
+Wed Apr 22 14:24:41 2026 : Warning: Ignoring "ldap" (see raddb/mods-available/README.rst)
+Wed Apr 22 14:24:41 2026 : Info: Loaded virtual server default
+Wed Apr 22 14:24:41 2026 : Info:  # Skipping contents of 'if' as it is always 'false' -- /home/ubuntu/edhoc/output/freeradius_aaa/raddb/sites-enabled/inner-tunnel:364
+Wed Apr 22 14:24:41 2026 : Info: Loaded virtual server inner-tunnel
+Wed Apr 22 14:24:41 2026 : Info: Ready to process requests
+Wed Apr 22 14:24:42 2026 : Error: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Wed Apr 22 14:24:42 2026 : Error: BlastRADIUS check: Received packet with Message-Authenticator.
+Wed Apr 22 14:24:42 2026 : Error: Setting "require_message_authenticator = true" for client localhost
+Wed Apr 22 14:24:42 2026 : Error: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Wed Apr 22 14:24:42 2026 : Error: It looks like the client has been updated to protect from the BlastRADIUS attack.
+Wed Apr 22 14:24:42 2026 : Error: Please set "require_message_authenticator = true" for client localhost
+Wed Apr 22 14:24:42 2026 : Error: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

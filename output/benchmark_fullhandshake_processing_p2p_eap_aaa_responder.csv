@@ -1,0 +1,6 @@
+type,role,processing_us,txrx_us,precomputation_us,overhead_us,total_us
+Section2,Responder,87062.37,95241.14,916.23,0.00,183219.74
+Section32,Responder,107113.95,101499.93,1118.96,0.00,209732.85
+Section33,Responder,151126.17,177395.09,965.98,0.00,329487.24
+Section34,Responder,152632.09,123155.73,503.63,0.00,276291.45
+Section35,Responder,162854.87,160622.26,698.93,0.00,324176.06

@@ -1,8 +1,9 @@
 # EDHOC PQ Benchmark Workspace
 
-Workspace ini berisi benchmark handshake EDHOC PQ dengan dua mode:
+Workspace ini berisi benchmark handshake EDHOC PQ dengan tiga mode:
 - Non-EAP baseline (existing)
-- EAP standalone wrapper (baru), untuk komparasi section-by-section
+- EAP standalone wrapper (NAS mengakhiri sendiri)
+- EAP + AAA hop ke server FreeRADIUS (NAS mendelegasikan ke AAA)
 
 ## Build
 
@@ -16,6 +17,8 @@ Binary yang dihasilkan:
 - `build/p2p_responder`
 - `build/p2p_eap_initiator`
 - `build/p2p_eap_responder`
+- `build/p2p_eap_aaa_initiator`
+- `build/p2p_eap_aaa_responder`
 
 ## Run Non-EAP (baseline)
 
@@ -73,6 +76,73 @@ Output EAP utama:
 - `output/benchmark_eap_keymat_initiator.csv` (MSK/EMSK)
 - `output/benchmark_eap_keymat_responder.csv` (MSK/EMSK)
 
+## Run EAP + AAA (FreeRADIUS hop)
+
+Mode ini menjalankan flow EAP+EDHOC yang sama dengan mode standalone,
+ditambah satu round-trip RADIUS Access-Request/Access-Accept ke server
+FreeRADIUS lokal setelah tiap iterasi handshake. Tujuannya untuk
+mengukur biaya AAA hop secara terpisah dari biaya kripto/EAP.
+
+Prasyarat sekali per workspace:
+
+```bash
+# Hentikan FreeRADIUS sistem (kalau aktif) supaya port bebas:
+sudo systemctl stop freeradius || true
+
+# Generate raddb v3 di output/freeradius_aaa/raddb (auth UDP/3812):
+./scripts/freeradius_aaa/prepare.sh
+```
+
+Terminal A (jalankan FreeRADIUS, biarkan terbuka):
+
+```bash
+./scripts/freeradius_aaa/run_server.sh
+```
+
+Smoke test (opsional):
+
+```bash
+./scripts/freeradius_aaa/smoke_test.sh 127.0.0.1 3812 testing123 \
+    edhoc_Section2 edhoc-pass
+# Harus menerima Access-Accept.
+```
+
+Terminal B (responder/NAS):
+
+```bash
+./build/p2p_eap_aaa_responder 9097 5 5 256 57
+```
+
+Terminal C (initiator/supplicant):
+
+```bash
+./build/p2p_eap_aaa_initiator 127.0.0.1 9097 5 5 256 57
+```
+
+Output AAA mode:
+- Semua CSV di mode EAP standalone, dengan suffix `_aaa` pada nama
+  binary side (contoh `benchmark_crypto_eap_aaa_initiator.csv`,
+  `benchmark_fullhandshake_operation_p2p_eap_aaa_responder.csv`,
+  `internal_test_vectors_sections_eap_aaa.csv`).
+- Tambahan khusus AAA:
+  `output/benchmark_aaa_auth_p2p_eap_aaa_responder.csv` dengan kolom
+  `section,calls,accepts,rejects,errors,rtt_avg_us,req_bytes_avg,resp_bytes_avg,total_bytes_avg`.
+
+User PAP yang dipakai per section (dibuat oleh `prepare.sh` di
+`output/freeradius_aaa/raddb/mods-config/files/authorize`):
+
+| Section   | User-Name        | Password    |
+| --------- | ---------------- | ----------- |
+| Section2  | `edhoc_Section2` | `edhoc-pass` |
+| Section32 | `edhoc_Section32`| `edhoc-pass` |
+| Section33 | `edhoc_Section33`| `edhoc-pass` |
+| Section34 | `edhoc_Section34`| `edhoc-pass` |
+| Section35 | `edhoc_Section35`| `edhoc-pass` |
+
+Shared secret RADIUS: `testing123` (client `127.0.0.1`).
+Implementasi klien RADIUS ada di `src/aaa_radius.c` (PAP +
+Message-Authenticator HMAC-MD5 untuk mitigasi BlastRADIUS).
+
 ## Overhead Metric Semantics
 
 File overhead (`benchmark_fullhandshake_overhead_*.csv`) memakai kolom berikut:
@@ -101,3 +171,4 @@ Catatan interpretasi:
 
 Dokumentasi handshake EAP tersedia di:
 - `docs/handshake_mermaid_eap_papon.md`
+- `docs/handshake_mermaid_aaa_papon.md` (3-aktor: Supplicant - NAS - FreeRADIUS)

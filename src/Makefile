@@ -17,12 +17,15 @@ SRC_COMMON := \
 	eap_wrap.c \
 	edhoc_plaintext.c \
 	pqclean_adapter.c \
-	pqclean_randombytes.c
+	pqclean_randombytes.c \
+	aaa_radius.c
 
 SRC_INITIATOR := p2p_initiator.c
 SRC_RESPONDER := p2p_responder.c
 SRC_EAP_INITIATOR := p2p_eap_initiator.c
 SRC_EAP_RESPONDER := p2p_eap_responder.c
+SRC_EAP_AAA_INITIATOR := p2p_eap_aaa_initiator.c
+SRC_EAP_AAA_RESPONDER := p2p_eap_aaa_responder.c
 
 PQCLEAN_KEM_SRC := $(wildcard $(ROOT)/lib/PQClean/crypto_kem/ml-kem-768/clean/*.c)
 PQCLEAN_SIG_SRC := $(wildcard $(ROOT)/lib/PQClean/crypto_sign/ml-dsa-65/clean/*.c)
@@ -31,36 +34,53 @@ PQCLEAN_COMMON_SRC := \
 	$(ROOT)/lib/PQClean/common/sha2.c \
 	$(ROOT)/lib/PQClean/common/sp800-185.c
 
-SRC_ALL := $(SRC_COMMON) $(SRC_INITIATOR) $(SRC_RESPONDER) $(SRC_EAP_INITIATOR) $(SRC_EAP_RESPONDER) $(PQCLEAN_KEM_SRC) $(PQCLEAN_SIG_SRC) $(PQCLEAN_COMMON_SRC)
-OBJ_ALL := $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC_ALL))
+PQ_OBJS := $(patsubst %.c,$(OBJ_DIR)/%.o,$(PQCLEAN_KEM_SRC) $(PQCLEAN_SIG_SRC) $(PQCLEAN_COMMON_SRC))
+COMMON_OBJS := $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC_COMMON))
 
-INITIATOR_OBJS := $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC_COMMON) $(SRC_INITIATOR) $(PQCLEAN_KEM_SRC) $(PQCLEAN_SIG_SRC) $(PQCLEAN_COMMON_SRC))
-RESPONDER_OBJS := $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC_COMMON) $(SRC_RESPONDER) $(PQCLEAN_KEM_SRC) $(PQCLEAN_SIG_SRC) $(PQCLEAN_COMMON_SRC))
-EAP_INITIATOR_OBJS := $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC_COMMON) $(SRC_EAP_INITIATOR) $(PQCLEAN_KEM_SRC) $(PQCLEAN_SIG_SRC) $(PQCLEAN_COMMON_SRC))
-EAP_RESPONDER_OBJS := $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC_COMMON) $(SRC_EAP_RESPONDER) $(PQCLEAN_KEM_SRC) $(PQCLEAN_SIG_SRC) $(PQCLEAN_COMMON_SRC))
+INITIATOR_OBJS         := $(COMMON_OBJS) $(OBJ_DIR)/$(SRC_INITIATOR:.c=.o)         $(PQ_OBJS)
+RESPONDER_OBJS         := $(COMMON_OBJS) $(OBJ_DIR)/$(SRC_RESPONDER:.c=.o)         $(PQ_OBJS)
+EAP_INITIATOR_OBJS     := $(COMMON_OBJS) $(OBJ_DIR)/$(SRC_EAP_INITIATOR:.c=.o)     $(PQ_OBJS)
+EAP_RESPONDER_OBJS     := $(COMMON_OBJS) $(OBJ_DIR)/$(SRC_EAP_RESPONDER:.c=.o)     $(PQ_OBJS)
+EAP_AAA_INITIATOR_OBJS := $(COMMON_OBJS) $(OBJ_DIR)/$(SRC_EAP_AAA_INITIATOR:.c=.o) $(PQ_OBJS)
+EAP_AAA_RESPONDER_OBJS := $(COMMON_OBJS) $(OBJ_DIR)/$(SRC_EAP_AAA_RESPONDER:.c=.o) $(PQ_OBJS)
 
-TARGET_INITIATOR := $(BUILD_DIR)/p2p_initiator
-TARGET_RESPONDER := $(BUILD_DIR)/p2p_responder
-TARGET_EAP_INITIATOR := $(BUILD_DIR)/p2p_eap_initiator
-TARGET_EAP_RESPONDER := $(BUILD_DIR)/p2p_eap_responder
+TARGET_INITIATOR         := $(BUILD_DIR)/p2p_initiator
+TARGET_RESPONDER         := $(BUILD_DIR)/p2p_responder
+TARGET_EAP_INITIATOR     := $(BUILD_DIR)/p2p_eap_initiator
+TARGET_EAP_RESPONDER     := $(BUILD_DIR)/p2p_eap_responder
+TARGET_EAP_AAA_INITIATOR := $(BUILD_DIR)/p2p_eap_aaa_initiator
+TARGET_EAP_AAA_RESPONDER := $(BUILD_DIR)/p2p_eap_aaa_responder
 
-all: $(TARGET_INITIATOR) $(TARGET_RESPONDER) $(TARGET_EAP_INITIATOR) $(TARGET_EAP_RESPONDER)
+ALL_TARGETS := \
+	$(TARGET_INITIATOR) $(TARGET_RESPONDER) \
+	$(TARGET_EAP_INITIATOR) $(TARGET_EAP_RESPONDER) \
+	$(TARGET_EAP_AAA_INITIATOR) $(TARGET_EAP_AAA_RESPONDER)
+
+all: $(ALL_TARGETS)
 
 $(TARGET_INITIATOR): $(INITIATOR_OBJS)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(INITIATOR_OBJS) -o $@ $(LDFLAGS_COMMON)
+	$(CC) $^ -o $@ $(LDFLAGS_COMMON)
 
 $(TARGET_RESPONDER): $(RESPONDER_OBJS)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(RESPONDER_OBJS) -o $@ $(LDFLAGS_COMMON)
+	$(CC) $^ -o $@ $(LDFLAGS_COMMON)
 
 $(TARGET_EAP_INITIATOR): $(EAP_INITIATOR_OBJS)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(EAP_INITIATOR_OBJS) -o $@ $(LDFLAGS_COMMON)
+	$(CC) $^ -o $@ $(LDFLAGS_COMMON)
 
 $(TARGET_EAP_RESPONDER): $(EAP_RESPONDER_OBJS)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(EAP_RESPONDER_OBJS) -o $@ $(LDFLAGS_COMMON)
+	$(CC) $^ -o $@ $(LDFLAGS_COMMON)
+
+$(TARGET_EAP_AAA_INITIATOR): $(EAP_AAA_INITIATOR_OBJS)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $^ -o $@ $(LDFLAGS_COMMON)
+
+$(TARGET_EAP_AAA_RESPONDER): $(EAP_AAA_RESPONDER_OBJS)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $^ -o $@ $(LDFLAGS_COMMON)
 
 $(OBJ_DIR)/%.o: %.c
 	@mkdir -p $(dir $@)
@@ -79,6 +99,6 @@ $(OBJ_DIR)/$(ROOT)/lib/PQClean/common/%.o: $(ROOT)/lib/PQClean/common/%.c
 	$(CC) $(CFLAGS_COMMON) -O0 -c $< -o $@
 
 clean:
-	rm -rf $(OBJ_DIR) $(TARGET_INITIATOR) $(TARGET_RESPONDER) $(TARGET_EAP_INITIATOR) $(TARGET_EAP_RESPONDER)
+	rm -rf $(OBJ_DIR) $(ALL_TARGETS)
 
 .PHONY: all clean
