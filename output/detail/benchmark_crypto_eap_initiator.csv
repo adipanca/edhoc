@@ -1,0 +1,6 @@
+algorithm,operation,avg_us,stddev_us,min_us,max_us,median_us,iterations,key_length
+ML-KEM-768,Keygen,595.94,4.17,588.43,600.02,597.82,5,1184
+ML-KEM-768,Encaps,747.57,3.20,743.59,751.98,747.22,5,1088
+ML-KEM-768,Decaps,961.04,3.86,957.13,967.35,960.52,5,32
+MLDSA65,Signature,5819.69,3001.58,2470.52,10189.49,6330.69,5,3309
+MLDSA65,Verify,1508.09,14.03,1491.11,1526.24,1506.28,5,1952
