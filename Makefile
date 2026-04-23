@@ -5,6 +5,19 @@ OBJ_DIR := $(BUILD_DIR)/obj_p2p
 
 CC ?= gcc
 
+# ---- Bootstrap: pastikan submodule sudah ter-checkout SEBELUM Makefile
+# meng-evaluasi $(wildcard ...) di bawah. Tanpa ini, `rm -rf lib && make`
+# akan gagal dengan "No rule to make target ... fips202.o" karena pattern
+# rule butuh source .c yang belum ada saat parse phase.
+ifeq ($(wildcard $(ROOT)/lib/PQClean/common/fips202.c),)
+  ifneq ($(MAKECMDGOALS),clean)
+  ifneq ($(MAKECMDGOALS),distclean)
+    $(info [setup] lib/PQClean atau lib/uoscore-uedhoc belum ada, init submodule...)
+    $(shell git -C $(ROOT) submodule update --init --recursive lib/PQClean lib/uoscore-uedhoc >&2)
+  endif
+  endif
+endif
+
 CFLAGS_COMMON := -std=c11 -Wall -Wextra -I$(ROOT)/include -I$(SRC_DIR) \
 	-I$(ROOT)/lib/PQClean \
 	-I$(ROOT)/lib/PQClean/common \
@@ -68,7 +81,33 @@ SUBMODULE_STAMP := $(BUILD_DIR)/.submodules.stamp
 FREERADIUS_STAMP := $(ROOT)/output/freeradius_aaa/raddb/radiusd.conf
 SETUP_STAMPS := $(SUBMODULE_STAMP) $(FREERADIUS_STAMP)
 
-all: setup $(ALL_TARGETS)
+# ---- Progress bar ----------------------------------------------------
+# Counter file: each compile step appends one byte; we read its size to
+# compute percentage against TOTAL_OBJS. Works under -j (append is small
+# and POSIX-atomic for short writes).
+ALL_OBJS := $(sort $(INITIATOR_OBJS) $(RESPONDER_OBJS) \
+	$(EAP_INITIATOR_OBJS) $(EAP_RESPONDER_OBJS) \
+	$(EAP_AAA_INITIATOR_OBJS) $(EAP_AAA_RESPONDER_OBJS))
+TOTAL_OBJS := $(words $(ALL_OBJS))
+PROGRESS_FILE := $(BUILD_DIR)/.progress
+
+define progress
+	@mkdir -p $(BUILD_DIR); printf '.' >> $(PROGRESS_FILE); \
+	done=$$(stat -c%s $(PROGRESS_FILE) 2>/dev/null || wc -c < $(PROGRESS_FILE)); \
+	total=$(TOTAL_OBJS); \
+	pct=$$(( done * 100 / total )); \
+	bar_w=30; filled=$$(( done * bar_w / total )); \
+	bar=$$(printf '%*s' $$filled '' | tr ' ' '#'); \
+	empty=$$(printf '%*s' $$(( bar_w - filled )) ''); \
+	printf '\r[build %3d%%] [%s%s] (%d/%d) %s\033[K' "$$pct" "$$bar" "$$empty" "$$done" "$$total" "$(notdir $1)"
+endef
+
+all: setup $(ALL_TARGETS) build_success
+
+build_success: $(ALL_TARGETS)
+	@printf '\n[build 100%%] Build successfully \xe2\x9c\x94 (%d objects, %d binaries)\n' \
+		$(TOTAL_OBJS) $(words $(ALL_TARGETS))
+	@rm -f $(PROGRESS_FILE)
 
 setup: $(SETUP_STAMPS)
 
@@ -78,6 +117,7 @@ setup: $(SETUP_STAMPS)
 # use the system FreeRADIUS v3 package instead.
 $(SUBMODULE_STAMP):
 	@mkdir -p $(BUILD_DIR)
+	@rm -f $(PROGRESS_FILE)
 	@if [ -d $(ROOT)/.git ]; then \
 		echo "[setup] git submodule update --init --recursive lib/PQClean lib/uoscore-uedhoc"; \
 		git -C $(ROOT) submodule update --init --recursive lib/PQClean lib/uoscore-uedhoc; \
@@ -93,58 +133,70 @@ $(FREERADIUS_STAMP): $(SUBMODULE_STAMP)
 
 $(TARGET_INITIATOR): $(INITIATOR_OBJS)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $^ -o $@ $(LDFLAGS_COMMON)
+	@printf '\n[link] %s\n' $(notdir $@)
+	@$(CC) $^ -o $@ $(LDFLAGS_COMMON)
 
 $(TARGET_RESPONDER): $(RESPONDER_OBJS)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $^ -o $@ $(LDFLAGS_COMMON)
+	@printf '[link] %s\n' $(notdir $@)
+	@$(CC) $^ -o $@ $(LDFLAGS_COMMON)
 
 $(TARGET_EAP_INITIATOR): $(EAP_INITIATOR_OBJS)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $^ -o $@ $(LDFLAGS_COMMON)
+	@printf '[link] %s\n' $(notdir $@)
+	@$(CC) $^ -o $@ $(LDFLAGS_COMMON)
 
 $(TARGET_EAP_RESPONDER): $(EAP_RESPONDER_OBJS)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $^ -o $@ $(LDFLAGS_COMMON)
+	@printf '[link] %s\n' $(notdir $@)
+	@$(CC) $^ -o $@ $(LDFLAGS_COMMON)
 
 $(TARGET_EAP_AAA_INITIATOR): $(EAP_AAA_INITIATOR_OBJS)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $^ -o $@ $(LDFLAGS_COMMON)
+	@printf '[link] %s\n' $(notdir $@)
+	@$(CC) $^ -o $@ $(LDFLAGS_COMMON)
 
 $(TARGET_EAP_AAA_RESPONDER): $(EAP_AAA_RESPONDER_OBJS)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $^ -o $@ $(LDFLAGS_COMMON)
+	@printf '[link] %s\n' $(notdir $@)
+	@$(CC) $^ -o $@ $(LDFLAGS_COMMON)
 
 $(WRAPPER_INITIATOR): $(WRAPPER_INITIATOR_SRC)
 	@mkdir -p $(BUILD_DIR)
-	cp $< $@
-	chmod +x $@
+	@cp $< $@
+	@chmod +x $@
+	@printf '[wrap] %s\n' $(notdir $@)
 
 $(WRAPPER_RESPONDER): $(WRAPPER_RESPONDER_SRC)
 	@mkdir -p $(BUILD_DIR)
-	cp $< $@
-	chmod +x $@
+	@cp $< $@
+	@chmod +x $@
+	@printf '[wrap] %s\n' $(notdir $@)
 
-$(OBJ_DIR)/$(SRC_DIR)/%.o: $(SRC_DIR)/%.c
+$(OBJ_DIR)/$(SRC_DIR)/%.o: $(SRC_DIR)/%.c | $(SETUP_STAMPS)
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS_COMMON) -c $< -o $@
+	$(call progress,$@)
+	@$(CC) $(CFLAGS_COMMON) -c $< -o $@
 
-$(OBJ_DIR)/$(ROOT)/lib/PQClean/crypto_kem/ml-kem-768/clean/%.o: $(ROOT)/lib/PQClean/crypto_kem/ml-kem-768/clean/%.c
+$(OBJ_DIR)/$(ROOT)/lib/PQClean/crypto_kem/ml-kem-768/clean/%.o: $(ROOT)/lib/PQClean/crypto_kem/ml-kem-768/clean/%.c | $(SUBMODULE_STAMP)
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS_COMMON) -O0 -c $< -o $@
+	$(call progress,$@)
+	@$(CC) $(CFLAGS_COMMON) -O0 -c $< -o $@
 
-$(OBJ_DIR)/$(ROOT)/lib/PQClean/crypto_sign/ml-dsa-65/clean/%.o: $(ROOT)/lib/PQClean/crypto_sign/ml-dsa-65/clean/%.c
+$(OBJ_DIR)/$(ROOT)/lib/PQClean/crypto_sign/ml-dsa-65/clean/%.o: $(ROOT)/lib/PQClean/crypto_sign/ml-dsa-65/clean/%.c | $(SUBMODULE_STAMP)
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS_COMMON) -O0 -c $< -o $@
+	$(call progress,$@)
+	@$(CC) $(CFLAGS_COMMON) -O0 -c $< -o $@
 
-$(OBJ_DIR)/$(ROOT)/lib/PQClean/common/%.o: $(ROOT)/lib/PQClean/common/%.c
+$(OBJ_DIR)/$(ROOT)/lib/PQClean/common/%.o: $(ROOT)/lib/PQClean/common/%.c | $(SUBMODULE_STAMP)
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS_COMMON) -O0 -c $< -o $@
+	$(call progress,$@)
+	@$(CC) $(CFLAGS_COMMON) -O0 -c $< -o $@
 
 clean:
-	rm -rf $(OBJ_DIR) $(ALL_TARGETS) $(SUBMODULE_STAMP)
+	rm -rf $(OBJ_DIR) $(ALL_TARGETS) $(SUBMODULE_STAMP) $(PROGRESS_FILE)
 
 distclean: clean
 	rm -rf $(ROOT)/output/freeradius_aaa $(ROOT)/output/detail $(ROOT)/output/result
 
-.PHONY: all setup clean distclean
+.PHONY: all setup build_success clean distclean
