@@ -19,20 +19,18 @@
 #   SKIP_FREERADIUS=1 to skip starting FreeRADIUS (assume already running)
 set -euo pipefail
 
-if [ $# -lt 1 ]; then
-    echo "usage: $0 <base_port>" >&2
-    exit 1
-fi
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." >/dev/null 2>&1 && pwd)"
+CONFIG_FILE="${CONFIG_FILE:-$REPO_ROOT/config/benchmark.conf}"
+[ -f "$CONFIG_FILE" ] && . "$CONFIG_FILE"
 
-BASE_PORT=$1
+BASE_PORT=${1:-${BASE_PORT:-15000}}
 ITER=${ITER:-5}
 CRYPTO_ITER=${CRYPTO_ITER:-5}
 MTU=${MTU:-256}
 EAP_METHOD=${EAP_METHOD:-57}
 AAA_PORT=${AAA_PORT:-3812}
 
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." >/dev/null 2>&1 && pwd)"
 BUILD_DIR="$REPO_ROOT/build"
 OUTPUT_DIR="$REPO_ROOT/output"
 DETAIL_DIR="$OUTPUT_DIR/detail"

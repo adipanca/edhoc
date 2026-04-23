@@ -1,6 +1,0 @@
-section;status EAP;role;calls;accepts;rejects;errors;rtt_avg_us;req_bytes_avg;resp_bytes_avg;total_bytes_avg
-Section2;AAA;Responder;2;2;0;0;1174.864;78.0;38.0;116.0
-Section32;AAA;Responder;2;2;0;0;741.493;79.0;38.0;117.0
-Section33;AAA;Responder;2;2;0;0;962.721;79.0;38.0;117.0
-Section34;AAA;Responder;2;2;0;0;1084.740;79.0;38.0;117.0
-Section35;AAA;Responder;2;2;0;0;783.867;79.0;38.0;117.0

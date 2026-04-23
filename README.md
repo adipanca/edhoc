@@ -123,6 +123,12 @@ git submodule update --init --recursive lib/PQClean lib/uoscore-uedhoc
 git submodule update --init lib/freeradius-server || true
 ```
 
+> Catatan: `make -j"$(nproc)"` sudah otomatis menjalankan
+> `git submodule update --init lib/PQClean lib/uoscore-uedhoc` dan
+> `scripts/freeradius_aaa/prepare.sh` (hanya pertama kali, hasilnya
+> di-cache di `build/.submodules.stamp` dan
+> `output/freeradius_aaa/raddb/`). Reset penuh: `make distclean`.
+
 Dependency sistem (Ubuntu/Debian/Raspberry Pi OS):
 
 ```bash
@@ -144,6 +150,23 @@ make -j"$(nproc)"
 ```
 
 (Dijalankan dari root repo - `Makefile` ada di root.)
+
+Build pertama akan otomatis: (1) init submodule PQClean & uoscore-uedhoc,
+(2) jalankan `scripts/freeradius_aaa/prepare.sh` untuk menyiapkan raddb
+FreeRADIUS di `output/freeradius_aaa/`. Stamp disimpan supaya build
+berikutnya tidak mengulang.
+
+Konfigurasi default benchmark ada di [config/benchmark.conf](config/benchmark.conf)
+(ITER, CRYPTO_ITER, MTU, EAP_METHOD, BASE_PORT, RESPONDER_IP, AAA_PORT).
+Setelah `make` selesai, jalankan tanpa argumen:
+
+```bash
+./build/responder       # server, pakai default dari config
+./build/initiator       # client, default RESPONDER_IP=127.0.0.1
+```
+
+Override per-run lewat env atau argumen positional, mis.
+`ITER=20 ./build/responder 9000` atau `./build/initiator 192.168.1.10 9000`.
 
 Binary yang dihasilkan di `build/`:
 
@@ -415,6 +438,44 @@ Catatan:
   forward ke ML-KEM-768 / ML-DSA-65 PQClean clean.
 - **Benchmark runtime** (`src/benchmark.c`): wallclock + CPU-time +
   RSS sampling, plus akumulator per-operasi.
+
+## 11.1 Sanity-check hasil benchmark (loopback, ITER=5)
+
+Hasil dari run referensi (Ubuntu x86_64, loopback `127.0.0.1`,
+ITER=CRYPTO_ITER=5, MTU=256, EAP method 57):
+
+- **Crypto per-operasi (median, μs)**: ML-KEM-768 keygen/encaps/decaps
+  ≈ 130-200 μs, ML-DSA-65 sign ≈ 1.0-1.8 ms, verify ≈ 0.4-0.8 ms.
+  Sesuai ekspektasi PQClean clean variant: keygen+encaps+decaps KEM
+  jauh lebih murah daripada sign Dilithium, dan verify lebih murah
+  daripada sign — konsisten dengan teori ML-DSA (sign perlu rejection
+  sampling, verify hanya satu ekspansi).
+- **Ukuran wire (MTU=256)**: msg2 Section32/33/35 ≈ 4498 B karena
+  membawa ML-DSA-65 signature (3309 B) + struktur EDHOC; msg3 Section32
+  juga besar (4449 B) karena memuat signature initiator. Section2
+  (classic ECDH+EdDSA) jauh lebih kecil (msg1=2272 B karena membawa
+  X25519 ephemeral + ML-KEM ciphertext untuk varian PQ-hybrid kami).
+  Jumlah fragmen EAP cocok dengan `ceil(wire/MTU)`.
+- **MSK/EMSK**: panjang 64 B (RFC 5295 §3.2). Verifikator: kolom MSK
+  sama persis antara Initiator dan Responder per section/mode (lihat
+  `output/result/benchmark_eap_keymat_.csv`).
+- **AAA RTT**: 0.4-1.7 ms loopback dengan FreeRADIUS lokal,
+  request 78-79 B / response 38 B (RADIUS Access-Request PAP +
+  Message-Authenticator vs Access-Accept tanpa atribut).
+
+Konsistensi antar-run:
+- Ukuran wire (`benchmark_fullhandshake_fragmentation_p2p_.csv`) **identik
+  byte-per-byte** antar dua run berturut-turut → struktur protokol
+  deterministik.
+- MSK/EMSK **berbeda** antar run karena ephemeral key pair
+  (X25519 / ML-KEM) di-regenerate setiap handshake — ini yang **harus**
+  terjadi (forward secrecy).
+- TH2/TH3/TH4, MAC2/MAC3, prk4e3m juga berbeda antar run (turunan
+  dari ephemeral) — sesuai EDHOC §4.1.
+- Latency wall-time (`benchmark_fullhandshake_operation_p2p_.csv`,
+  `benchmark_aaa_auth_p2p_.csv`) bervariasi karena scheduler/jitter
+  loopback, namun ordering antar section/mode tetap konsisten
+  (Section2 < Section32 < Section33/35 ≈ kompleksitas crypto).
 
 ## 12. Dokumentasi tambahan
 

@@ -18,21 +18,19 @@
 #   START_DELAY   (default 1)   seconds to wait for responder readiness per mode
 set -euo pipefail
 
-if [ $# -lt 2 ]; then
-    echo "usage: $0 <responder_ip> <base_port>" >&2
-    exit 1
-fi
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." >/dev/null 2>&1 && pwd)"
+CONFIG_FILE="${CONFIG_FILE:-$REPO_ROOT/config/benchmark.conf}"
+[ -f "$CONFIG_FILE" ] && . "$CONFIG_FILE"
 
-RESP_IP=$1
-BASE_PORT=$2
+RESP_IP=${1:-${RESPONDER_IP:-127.0.0.1}}
+BASE_PORT=${2:-${BASE_PORT:-15000}}
 ITER=${ITER:-5}
 CRYPTO_ITER=${CRYPTO_ITER:-5}
 MTU=${MTU:-256}
 EAP_METHOD=${EAP_METHOD:-57}
 START_DELAY=${START_DELAY:-1}
 
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." >/dev/null 2>&1 && pwd)"
 BUILD_DIR="$REPO_ROOT/build"
 OUTPUT_DIR="$REPO_ROOT/output"
 DETAIL_DIR="$OUTPUT_DIR/detail"

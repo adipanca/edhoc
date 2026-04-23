@@ -64,7 +64,32 @@ ALL_TARGETS := \
 	$(TARGET_EAP_AAA_INITIATOR) $(TARGET_EAP_AAA_RESPONDER) \
 	$(WRAPPER_INITIATOR) $(WRAPPER_RESPONDER)
 
-all: $(ALL_TARGETS)
+SUBMODULE_STAMP := $(BUILD_DIR)/.submodules.stamp
+FREERADIUS_STAMP := $(ROOT)/output/freeradius_aaa/raddb/radiusd.conf
+SETUP_STAMPS := $(SUBMODULE_STAMP) $(FREERADIUS_STAMP)
+
+all: setup $(ALL_TARGETS)
+
+setup: $(SETUP_STAMPS)
+
+# Auto-init git submodules (PQClean, uoscore-uedhoc) the first time the
+# build runs. lib/freeradius-server is intentionally NOT initialized: it
+# carries nested SSH-only submodules and we use the system FreeRADIUS v3
+# package instead.
+$(SUBMODULE_STAMP):
+	@mkdir -p $(BUILD_DIR)
+	@if [ -d $(ROOT)/.git ]; then \
+		echo "[setup] git submodule update --init lib/PQClean lib/uoscore-uedhoc"; \
+		git -C $(ROOT) submodule update --init lib/PQClean lib/uoscore-uedhoc; \
+	else \
+		echo "[setup] not a git checkout, skipping submodule init"; \
+	fi
+	@touch $@
+
+# First-time FreeRADIUS raddb prep for AAA mode.
+$(FREERADIUS_STAMP): $(SUBMODULE_STAMP)
+	@echo "[setup] preparing FreeRADIUS raddb (output/freeradius_aaa/)"
+	@$(ROOT)/scripts/freeradius_aaa/prepare.sh
 
 $(TARGET_INITIATOR): $(INITIATOR_OBJS)
 	@mkdir -p $(BUILD_DIR)
@@ -117,6 +142,9 @@ $(OBJ_DIR)/$(ROOT)/lib/PQClean/common/%.o: $(ROOT)/lib/PQClean/common/%.c
 	$(CC) $(CFLAGS_COMMON) -O0 -c $< -o $@
 
 clean:
-	rm -rf $(OBJ_DIR) $(ALL_TARGETS)
+	rm -rf $(OBJ_DIR) $(ALL_TARGETS) $(SUBMODULE_STAMP)
 
-.PHONY: all clean
+distclean: clean
+	rm -rf $(ROOT)/output/freeradius_aaa $(ROOT)/output/detail $(ROOT)/output/result
+
+.PHONY: all setup clean distclean
