@@ -32,39 +32,52 @@ mbedTLS/libsodium):
 - **MD5 / HMAC-MD5**: hanya untuk encoding RADIUS PAP +
   Message-Authenticator (RFC 2865 / RFC 3579), bukan untuk EDHOC.
 
-Hasil benchmark ditulis ke `output/*.csv`. Skrip
-`scripts/merge_benchmarks.py` menggabungkan CSV per-mode menjadi satu
-file ber-`;` agar mudah dibaca di spreadsheet.
+Hasil benchmark per-mode ditulis ke `output/detail/*.csv`, lalu skrip
+`scripts/merge_benchmarks.py` menggabungkan menjadi file ber-`;` di
+`output/result/*.csv` agar mudah dibaca di spreadsheet.
 
 ## 1. Struktur repository
 
 ```
 edhoc/
-  src/                         <- source EDHOC + EAP + AAA + Makefile
+  Makefile                     <- build seluruh binary (dijalankan dari root)
+  include/                     <- public headers (-Iinclude saat compile)
+    eap_wrap.h
+    edhoc_plaintext.h
+    aaa_radius.h
+    pqclean_adapter.h
+    benchmark.h
+  src/                         <- source EDHOC + EAP + AAA
     p2p_initiator.c            (mode 1: Non-EAP)
     p2p_responder.c
     p2p_eap_initiator.c        (mode 2: EAP standalone)
     p2p_eap_responder.c
     p2p_eap_aaa_initiator.c    (mode 3: wrapper -DBENCH_AAA / BENCH_TAG="_aaa")
     p2p_eap_aaa_responder.c
-    eap_wrap.c / .h            (EAP framing + fragmentasi)
-    edhoc_plaintext.c / .h     (lima varian PAPOn EDHOC)
-    aaa_radius.c / .h          (klien RADIUS PAP + Message-Authenticator)
-    pqclean_adapter.c / .h     (jembatan PQClean untuk KEM/Sign)
-    benchmark.c / .h           (pengukuran waktu, RSS, fragmentasi)
-    Makefile                   (build seluruh binary)
+    eap_wrap.c                 (EAP framing + fragmentasi)
+    edhoc_plaintext.c          (lima varian PAPOn EDHOC)
+    aaa_radius.c               (klien RADIUS PAP + Message-Authenticator)
+    pqclean_adapter.c          (jembatan PQClean untuk KEM/Sign)
+    benchmark.c                (pengukuran waktu, RSS, fragmentasi)
   build/                       <- artefak hasil build (auto-generated)
+    initiator, responder       (wrapper bash 1-perintah)
+    p2p_*                      (binary per mode)
   scripts/
+    run_all_initiator.sh       (jalankan 3 mode lalu merge)
+    run_all_responder.sh
+    merge_benchmarks.py        (gabungkan CSV per-mode)
     freeradius_aaa/
       prepare.sh               (siapkan tree raddb v3 di output/)
       run_server.sh            (jalankan FreeRADIUS foreground)
       smoke_test.sh            (radclient PAP test)
-    merge_benchmarks.py        (gabungkan CSV per-mode)
   lib/
     PQClean/                   (ML-KEM-768, ML-DSA-65 - submodule)
     uoscore-uedhoc/            (header mbedTLS, helper - submodule)
     freeradius-server/         (referensi v4 - submodule, opsional)
-  output/                      <- hasil benchmark (CSV) + raddb FreeRADIUS
+  output/
+    detail/                    <- CSV per-mode/per-role (mentah)
+    result/                    <- CSV gabungan ber-';' (final)
+    freeradius_aaa/            <- raddb v3 hasil prepare.sh
   docs/
     handshake_mermaid_eap_papon.md
     handshake_mermaid_aaa_papon.md          (3 aktor: Sup-NAS-AAA)
@@ -127,9 +140,10 @@ tidak perlu paket tambahan.
 ## 4. Build
 
 ```bash
-cd src
 make -j"$(nproc)"
 ```
+
+(Dijalankan dari root repo - `Makefile` ada di root.)
 
 Binary yang dihasilkan di `build/`:
 
@@ -146,7 +160,7 @@ Wrapper `p2p_eap_aaa_*` adalah file 3-baris yang
 `#define BENCH_AAA + BENCH_TAG "_aaa"` lalu `#include` source EAP yang
 sama, sehingga tidak ada duplikasi logic.
 
-Bersihkan artefak: `cd src && make clean`.
+Bersihkan artefak: `make clean`.
 
 ## 5. Quickstart - jalankan 3 mode dalam 1 perintah
 
@@ -196,7 +210,7 @@ Flag opsional:
 - `AAA_PORT=3812` (responder) - port UDP FreeRADIUS.
 
 Hasil akhir:
-- Per-mode CSV tetap di `output/*.csv`.
+- Per-mode CSV mentah di `output/detail/*.csv`.
 - File gabungan ber-`;` di `output/result/*.csv` (lihat bagian 9).
 
 ## 6. Run manual per mode (opsional)
@@ -228,13 +242,13 @@ Lihat bagian 7 untuk setup FreeRADIUS, kemudian:
 
 Argumen umum: `<port|ip+port> <iter> <crypto_iter> [<mtu> <eap_method>]`.
 
-Output per-mode (sebelum merge):
-- `output/benchmark_crypto_{initiator,responder}.csv`
-- `output/benchmark_fullhandshake_{operation,overhead,processing}_p2p[_eap[_aaa]]_{initiator,responder}.csv`
-- `output/benchmark_fragmentation[_eap[_aaa]]_{initiator,responder}.csv` (mode 2 & 3)
-- `output/benchmark_eap_keymat[_eap[_aaa]]_{initiator,responder}.csv` (mode 2 & 3)
-- `output/internal_test_vectors_sections[_eap[_aaa]].csv`
-- `output/benchmark_aaa_auth_p2p_eap_aaa_responder.csv` (mode 3)
+Output per-mode (sebelum merge) ditulis ke `output/detail/`:
+- `output/detail/benchmark_crypto_{initiator,responder}.csv`
+- `output/detail/benchmark_fullhandshake_{operation,overhead,processing}_p2p[_eap[_aaa]]_{initiator,responder}.csv`
+- `output/detail/benchmark_fragmentation[_eap[_aaa]]_{initiator,responder}.csv` (mode 2 & 3)
+- `output/detail/benchmark_eap_keymat[_eap[_aaa]]_{initiator,responder}.csv` (mode 2 & 3)
+- `output/detail/internal_test_vectors_sections[_eap[_aaa]].csv`
+- `output/detail/benchmark_aaa_auth_p2p_eap_aaa_responder.csv` (mode 3)
 
 ## 7. Setup FreeRADIUS untuk mode AAA
 
@@ -323,10 +337,10 @@ Langkah:
 
    ```bash
    # Di server, salin CSV initiator dari Pi
-   scp pi@raspberrypi:edhoc/output/*_initiator.csv server:edhoc/output/
-   scp pi@raspberrypi:edhoc/output/internal_test_vectors_sections*.csv server:edhoc/output/
+   scp pi@raspberrypi:edhoc/output/detail/*_initiator.csv server:edhoc/output/detail/
+   scp pi@raspberrypi:edhoc/output/detail/internal_test_vectors_sections*.csv server:edhoc/output/detail/
    # Lalu re-merge
-   python3 scripts/merge_benchmarks.py --result-dir output/result
+   python3 scripts/merge_benchmarks.py --output-dir output/detail --result-dir output/result
    ```
 
    (Wrapper sudah memanggil merger di tiap sisi, jadi `output/result/`

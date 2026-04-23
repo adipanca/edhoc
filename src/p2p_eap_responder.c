@@ -866,14 +866,14 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    write_crypto_csv("output/benchmark_crypto_eap" BENCH_TAG "_responder.csv", rows, nrows);
-    write_operation_csv("output/benchmark_fullhandshake_operation_p2p_eap" BENCH_TAG "_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &op_stats, iterations);
-    write_overhead_csv("output/benchmark_fullhandshake_overhead_p2p_eap" BENCH_TAG "_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &overhead);
-    write_processing_csv("output/benchmark_fullhandshake_processing_p2p_eap" BENCH_TAG "_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &timing);
-    write_eap_keymat_csv("output/benchmark_eap_keymat" BENCH_TAG "_responder.csv", msk, emsk);
-    write_fragmentation_csv("output/benchmark_fragmentation_eap" BENCH_TAG "_responder.csv", frag_stats, &op_stats, iterations, eap_mtu);
+    write_crypto_csv("output/detail/benchmark_crypto_eap" BENCH_TAG "_responder.csv", rows, nrows);
+    write_operation_csv("output/detail/benchmark_fullhandshake_operation_p2p_eap" BENCH_TAG "_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &op_stats, iterations);
+    write_overhead_csv("output/detail/benchmark_fullhandshake_overhead_p2p_eap" BENCH_TAG "_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &overhead);
+    write_processing_csv("output/detail/benchmark_fullhandshake_processing_p2p_eap" BENCH_TAG "_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &timing);
+    write_eap_keymat_csv("output/detail/benchmark_eap_keymat" BENCH_TAG "_responder.csv", msk, emsk);
+    write_fragmentation_csv("output/detail/benchmark_fragmentation_eap" BENCH_TAG "_responder.csv", frag_stats, &op_stats, iterations, eap_mtu);
 #ifdef BENCH_AAA
-    write_aaa_csv("output/benchmark_aaa_auth_p2p_eap_aaa_responder.csv");
+    write_aaa_csv("output/detail/benchmark_aaa_auth_p2p_eap_aaa_responder.csv");
 #endif
 
     close(sockfd);

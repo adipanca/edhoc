@@ -129,8 +129,8 @@ def merge_aaa_only(out_dir: str, result_dir: Optional[str] = None) -> Optional[s
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output-dir", "-o", default="output",
-                        help="Directory containing the per-mode CSVs (default: output)")
+    parser.add_argument("--output-dir", "-o", default="output/detail",
+                        help="Directory containing the per-mode CSVs (default: output/detail)")
     parser.add_argument("--result-dir", "-r", default=None,
                         help="Where to write the merged files (default: same as --output-dir)")
     args = parser.parse_args(argv)

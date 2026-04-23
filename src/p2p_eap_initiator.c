@@ -883,13 +883,13 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    write_crypto_csv("output/benchmark_crypto_eap" BENCH_TAG "_initiator.csv", rows, nrows);
-    write_operation_csv("output/benchmark_fullhandshake_operation_p2p_eap" BENCH_TAG "_initiator.csv", ROLE_NAMES[ROLE_INITIATOR], &op_stats, iterations);
-    write_overhead_csv("output/benchmark_fullhandshake_overhead_p2p_eap" BENCH_TAG "_initiator.csv", ROLE_NAMES[ROLE_INITIATOR], &overhead);
-    write_processing_csv("output/benchmark_fullhandshake_processing_p2p_eap" BENCH_TAG "_initiator.csv", ROLE_NAMES[ROLE_INITIATOR], &timing);
-    write_internal_vectors_csv("output/internal_test_vectors_sections_eap" BENCH_TAG ".csv", vectors);
-    write_eap_keymat_csv("output/benchmark_eap_keymat" BENCH_TAG "_initiator.csv", msk, emsk);
-    write_fragmentation_csv("output/benchmark_fragmentation_eap" BENCH_TAG "_initiator.csv", frag_stats, &op_stats, iterations, eap_mtu);
+    write_crypto_csv("output/detail/benchmark_crypto_eap" BENCH_TAG "_initiator.csv", rows, nrows);
+    write_operation_csv("output/detail/benchmark_fullhandshake_operation_p2p_eap" BENCH_TAG "_initiator.csv", ROLE_NAMES[ROLE_INITIATOR], &op_stats, iterations);
+    write_overhead_csv("output/detail/benchmark_fullhandshake_overhead_p2p_eap" BENCH_TAG "_initiator.csv", ROLE_NAMES[ROLE_INITIATOR], &overhead);
+    write_processing_csv("output/detail/benchmark_fullhandshake_processing_p2p_eap" BENCH_TAG "_initiator.csv", ROLE_NAMES[ROLE_INITIATOR], &timing);
+    write_internal_vectors_csv("output/detail/internal_test_vectors_sections_eap" BENCH_TAG ".csv", vectors);
+    write_eap_keymat_csv("output/detail/benchmark_eap_keymat" BENCH_TAG "_initiator.csv", msk, emsk);
+    write_fragmentation_csv("output/detail/benchmark_fragmentation_eap" BENCH_TAG "_initiator.csv", frag_stats, &op_stats, iterations, eap_mtu);
 
     close(sockfd);
     return 0;

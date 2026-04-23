@@ -569,10 +569,10 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    write_crypto_csv("output/benchmark_crypto_responder.csv", rows, nrows);
-    write_operation_csv("output/benchmark_fullhandshake_operation_p2p_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &op_stats, iterations);
-    write_overhead_csv("output/benchmark_fullhandshake_overhead_p2p_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &overhead);
-    write_processing_csv("output/benchmark_fullhandshake_processing_p2p_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &timing);
+    write_crypto_csv("output/detail/benchmark_crypto_responder.csv", rows, nrows);
+    write_operation_csv("output/detail/benchmark_fullhandshake_operation_p2p_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &op_stats, iterations);
+    write_overhead_csv("output/detail/benchmark_fullhandshake_overhead_p2p_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &overhead);
+    write_processing_csv("output/detail/benchmark_fullhandshake_processing_p2p_responder.csv", ROLE_NAMES[ROLE_RESPONDER], &timing);
 
     close(sockfd);
     return 0;

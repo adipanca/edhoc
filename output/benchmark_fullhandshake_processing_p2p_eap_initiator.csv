@@ -1,6 +1,0 @@
-type,role,processing_us,txrx_us,precomputation_us,overhead_us,total_us
-Section2,Initiator,84703.47,62017.56,470.27,0.00,147191.29
-Section32,Initiator,94304.60,81163.77,413.91,0.00,175882.28
-Section33,Initiator,205088.55,164143.88,523.39,0.00,369755.82
-Section34,Initiator,145258.01,119782.65,305.54,0.00,265346.20
-Section35,Initiator,218494.58,163518.08,741.89,0.00,382754.54

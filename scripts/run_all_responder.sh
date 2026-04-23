@@ -35,8 +35,9 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." >/dev/null 2>&1 && pwd)"
 BUILD_DIR="$REPO_ROOT/build"
 OUTPUT_DIR="$REPO_ROOT/output"
+DETAIL_DIR="$OUTPUT_DIR/detail"
 RESULT_DIR="$OUTPUT_DIR/result"
-mkdir -p "$OUTPUT_DIR" "$RESULT_DIR"
+mkdir -p "$DETAIL_DIR" "$RESULT_DIR"
 
 PORT_NONEAP=$BASE_PORT
 PORT_EAP=$((BASE_PORT + 1))
@@ -103,9 +104,9 @@ run_step "Mode 3 (EAP + AAA hop)" \
     "$BUILD_DIR/p2p_eap_aaa_responder" "$PORT_AAA" "$ITER" "$CRYPTO_ITER" "$MTU" "$EAP_METHOD"
 
 # Merge per-mode CSVs into output/result/
-echo "[responder] === merging CSVs into $RESULT_DIR ==="
+echo "[responder] === merging CSVs from $DETAIL_DIR into $RESULT_DIR ==="
 python3 "$REPO_ROOT/scripts/merge_benchmarks.py" \
-    --output-dir "$OUTPUT_DIR" \
+    --output-dir "$DETAIL_DIR" \
     --result-dir "$RESULT_DIR"
 
 echo "[responder] DONE"

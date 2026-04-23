@@ -662,11 +662,11 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    write_crypto_csv("output/benchmark_crypto_initiator.csv", rows, nrows);
-    write_operation_csv("output/benchmark_fullhandshake_operation_p2p_initiator.csv", ROLE_NAMES[ROLE_INITIATOR], &op_stats, iterations);
-    write_overhead_csv("output/benchmark_fullhandshake_overhead_p2p_initiator.csv", ROLE_NAMES[ROLE_INITIATOR], &overhead);
-    write_processing_csv("output/benchmark_fullhandshake_processing_p2p_initiator.csv", ROLE_NAMES[ROLE_INITIATOR], &timing);
-    write_internal_vectors_csv("output/internal_test_vectors_sections.csv", vectors);
+    write_crypto_csv("output/detail/benchmark_crypto_initiator.csv", rows, nrows);
+    write_operation_csv("output/detail/benchmark_fullhandshake_operation_p2p_initiator.csv", ROLE_NAMES[ROLE_INITIATOR], &op_stats, iterations);
+    write_overhead_csv("output/detail/benchmark_fullhandshake_overhead_p2p_initiator.csv", ROLE_NAMES[ROLE_INITIATOR], &overhead);
+    write_processing_csv("output/detail/benchmark_fullhandshake_processing_p2p_initiator.csv", ROLE_NAMES[ROLE_INITIATOR], &timing);
+    write_internal_vectors_csv("output/detail/internal_test_vectors_sections.csv", vectors);
 
     close(sockfd);
     return 0;
