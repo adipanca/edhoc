@@ -72,15 +72,15 @@ all: setup $(ALL_TARGETS)
 
 setup: $(SETUP_STAMPS)
 
-# Auto-init git submodules (PQClean, uoscore-uedhoc) the first time the
-# build runs. lib/freeradius-server is intentionally NOT initialized: it
-# carries nested SSH-only submodules and we use the system FreeRADIUS v3
-# package instead.
+# Auto-init git submodules (PQClean, uoscore-uedhoc) recursively the first
+# time the build runs. lib/freeradius-server is intentionally NOT
+# initialized: it carries nested SSH-only submodules (libbacktrace) and we
+# use the system FreeRADIUS v3 package instead.
 $(SUBMODULE_STAMP):
 	@mkdir -p $(BUILD_DIR)
 	@if [ -d $(ROOT)/.git ]; then \
-		echo "[setup] git submodule update --init lib/PQClean lib/uoscore-uedhoc"; \
-		git -C $(ROOT) submodule update --init lib/PQClean lib/uoscore-uedhoc; \
+		echo "[setup] git submodule update --init --recursive lib/PQClean lib/uoscore-uedhoc"; \
+		git -C $(ROOT) submodule update --init --recursive lib/PQClean lib/uoscore-uedhoc; \
 	else \
 		echo "[setup] not a git checkout, skipping submodule init"; \
 	fi

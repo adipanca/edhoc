@@ -32,9 +32,12 @@ mbedTLS/libsodium):
 - **MD5 / HMAC-MD5**: hanya untuk encoding RADIUS PAP +
   Message-Authenticator (RFC 2865 / RFC 3579), bukan untuk EDHOC.
 
-Hasil benchmark per-mode ditulis ke `output/detail/*.csv`, lalu skrip
-`scripts/merge_benchmarks.py` menggabungkan menjadi file ber-`;` di
-`output/result/*.csv` agar mudah dibaca di spreadsheet.
+Hasil benchmark per-mode ditulis ke `output/detail/*.csv` (di-commit
+ke git agar bisa di-share antar host). File gabungan ber-`;` di
+`output/result/*.csv` **TIDAK di-commit** dan **TIDAK dibuat otomatis**
+— digenerate lokal dengan `python3 scripts/merge_benchmarks.py` setelah
+Anda mengumpulkan CSV dari semua host. Ini sengaja, supaya
+`git pull --rebase` antara dua host tidak konflik di file gabungan.
 
 ## 1. Struktur repository
 
@@ -109,64 +112,66 @@ Detil sequence diagram per section/varian ada di
 [docs/handshake_mermaid_eap_papon.md](docs/handshake_mermaid_eap_papon.md)
 dan [docs/handshake_mermaid_aaa_papon.md](docs/handshake_mermaid_aaa_papon.md).
 
-## 3. Clone & install dependency
-
-Workspace ini memakai submodule `lib/PQClean`,
-`lib/uoscore-uedhoc`, dan `lib/freeradius-server` (opsional).
+## 3. Quickstart (4 langkah)
 
 ```bash
-git clone <repo-url> edhoc
-cd edhoc
-git submodule update --init --recursive lib/PQClean lib/uoscore-uedhoc
-# Submodule FreeRADIUS hanya dibutuhkan kalau ingin pakai source-tree v4
-# (mode AAA juga jalan dengan FreeRADIUS sistem v3, lihat bagian 6).
-git submodule update --init lib/freeradius-server || true
-```
+# 1. Clone
+git clone <repo-url> edhoc && cd edhoc
 
-> Catatan: `make -j"$(nproc)"` sudah otomatis menjalankan
-> `git submodule update --init lib/PQClean lib/uoscore-uedhoc` dan
-> `scripts/freeradius_aaa/prepare.sh` (hanya pertama kali, hasilnya
-> di-cache di `build/.submodules.stamp` dan
-> `output/freeradius_aaa/raddb/`). Reset penuh: `make distclean`.
-
-Dependency sistem (Ubuntu/Debian/Raspberry Pi OS):
-
-```bash
-sudo apt update
-sudo apt install -y \
-    build-essential pkg-config python3 \
+# 2. Install dependency sistem (sekali per mesin)
+sudo apt update && sudo apt install -y \
+    build-essential pkg-config python3 git \
     libsodium-dev libmbedtls-dev \
-    freeradius freeradius-utils    # untuk mode AAA
-```
+    freeradius freeradius-utils
+sudo systemctl stop freeradius || true   # bebaskan port 1812 (kita pakai 3812)
 
-Pada Raspberry Pi (arm64/armhf) cukup paket yang sama; build dilakukan
-native di Pi. PQClean dan uoscore-uedhoc dibawa lewat submodule jadi
-tidak perlu paket tambahan.
-
-## 4. Build
-
-```bash
+# 3. Build (otomatis: init submodule recursive + siapkan raddb FreeRADIUS)
+make clean
 make -j"$(nproc)"
+
+# 4. Jalankan 3 mode (Non-EAP, EAP standalone, EAP+AAA) sekaligus.
+#    Server (atau loopback):
+./build/responder 15000
+#    Client (Pi atau mesin lain):
+./build/initiator 192.168.1.10 15000
 ```
 
-(Dijalankan dari root repo - `Makefile` ada di root.)
+`make` melakukan otomatis (sekali, hasil di-cache di stamp file):
+- `git submodule update --init --recursive lib/PQClean lib/uoscore-uedhoc`
+- `scripts/freeradius_aaa/prepare.sh` → menyiapkan `output/freeradius_aaa/raddb/`
 
-Build pertama akan otomatis: (1) init submodule PQClean & uoscore-uedhoc,
-(2) jalankan `scripts/freeradius_aaa/prepare.sh` untuk menyiapkan raddb
-FreeRADIUS di `output/freeradius_aaa/`. Stamp disimpan supaya build
-berikutnya tidak mengulang.
+`./build/responder` melakukan otomatis:
+- start FreeRADIUS di UDP/3812 untuk durasi mode 3 lalu menghentikannya
+  saat selesai (lewat `scripts/freeradius_aaa/run_server.sh`).
+- jalankan ketiga binary `p2p_responder`, `p2p_eap_responder`,
+  `p2p_eap_aaa_responder` berurutan di port 15000/15001/15002.
 
-Konfigurasi default benchmark ada di [config/benchmark.conf](config/benchmark.conf)
-(ITER, CRYPTO_ITER, MTU, EAP_METHOD, BASE_PORT, RESPONDER_IP, AAA_PORT).
-Setelah `make` selesai, jalankan tanpa argumen:
+`./build/initiator` melakukan hal yang sama untuk sisi client.
+
+Setelah selesai, file mentah ada di `output/detail/` dengan suffix
+`_initiator.csv` atau `_responder.csv` — **tidak ada nama file yang
+konflik antara kedua sisi**, jadi:
 
 ```bash
-./build/responder       # server, pakai default dari config
-./build/initiator       # client, default RESPONDER_IP=127.0.0.1
+# di Raspberry Pi (initiator) setelah run selesai:
+git add output/detail && git commit -m "results initiator <host> <date>" && git push
+
+# di server (responder) setelah pull dari sisi initiator:
+git pull --rebase
+python3 scripts/merge_benchmarks.py --output-dir output/detail --result-dir output/result
 ```
 
-Override per-run lewat env atau argumen positional, mis.
-`ITER=20 ./build/responder 9000` atau `./build/initiator 192.168.1.10 9000`.
+Selesai — file gabungan ada di `output/result/*.csv`.
+
+## 3.1 Struktur repository
+
+## 4. Detail build
+
+```bash
+make -j"$(nproc)"        # build seluruh binary
+make clean               # hapus obj + binary + stamp submodule
+make distclean           # plus hapus output/{result,detail,freeradius_aaa}
+```
 
 Binary yang dihasilkan di `build/`:
 
@@ -183,58 +188,53 @@ Wrapper `p2p_eap_aaa_*` adalah file 3-baris yang
 `#define BENCH_AAA + BENCH_TAG "_aaa"` lalu `#include` source EAP yang
 sama, sehingga tidak ada duplikasi logic.
 
-Bersihkan artefak: `make clean`.
-
-## 5. Quickstart - jalankan 3 mode dalam 1 perintah
-
-Satu perintah `./build/responder` di sisi server dan satu perintah
-`./build/initiator` di sisi klien menjalankan **ketiga mode**
-(Non-EAP, EAP standalone, EAP+AAA) berurutan, lalu otomatis
-menggabungkan semua CSV ke `output/result/`.
-
-### Loopback (satu host)
-
-Terminal A (server):
+Konfigurasi default benchmark ada di [config/benchmark.conf](config/benchmark.conf)
+(`ITER`, `CRYPTO_ITER`, `MTU`, `EAP_METHOD`, `BASE_PORT`,
+`RESPONDER_IP`, `AAA_PORT`). Override per-run lewat env atau argumen
+positional:
 
 ```bash
-./build/responder 15000
+ITER=20 ./build/responder 9000
+./build/initiator 192.168.1.10 9000
 ```
 
-Terminal B (client):
+## 5. Catatan tentang MTU
+
+Flag `MTU` (default `256` byte) hanya relevan untuk **mode 2 (EAP
+standalone)** dan **mode 3 (EAP + AAA)** karena Non-EAP mengirim
+pesan EDHOC utuh tanpa fragmentasi.
+
+Referensi standar yang relevan:
+
+| Konteks transport | MTU/limit khas | Sumber |
+| ----------------- | -------------- | ------ |
+| EAP over LAN/802.1X | **1500 B** payload (Ethernet MTU) | RFC 3748 §3.1 |
+| EAP over RADIUS (`Framed-MTU`) | default **1500 B**, sering dipotong NAS jadi **1020-1024 B** | RFC 2865 §5.12, RFC 3579 §3.1 |
+| EDHOC over CoAP/UDP | **≤ 1024 B** per blok (Block-Wise) | RFC 9528 (EDHOC) + RFC 7959 |
+| EAP-TLS / EAP-TTLS fragmentation | sering set 1020 atau 1280 B | praktek industri |
+| IPv6 minimum link MTU | **1280 B** | RFC 8200 §5 |
+
+Kenapa default kami `MTU=256`?
+
+- Memaksa fragmentasi EAP (bahkan pesan kecil seperti `msg2` Section2
+  pecah jadi 5-10 fragmen) sehingga jalur fragmentasi/reassembly
+  benar-benar diuji.
+- Ekuivalen dengan kondisi terburuk pada link constrained
+  (LoRaWAN ≈ 222 B, BLE ≈ 244 B, 6LoWPAN ≈ 127 B IEEE 802.15.4 →
+  setelah header tersisa ~80 B). 256 B adalah kompromi yang masih
+  realistis untuk EAP framing.
+- Cocok untuk membandingkan jumlah fragmen secara linear:
+  `frags ≈ ceil(wire_bytes / MTU)`.
+
+Untuk benchmark "realistis Wi-Fi/Ethernet" set:
 
 ```bash
-./build/initiator 127.0.0.1 15000
+MTU=1020 ./build/responder 15000
+MTU=1020 ./build/initiator 192.168.1.10 15000
 ```
 
-Wrapper otomatis memakai port:
-- `15000` -> Non-EAP (`p2p_{initiator,responder}`)
-- `15001` -> EAP standalone (`p2p_eap_*`)
-- `15002` -> EAP + AAA (`p2p_eap_aaa_*`)
-
-Dan otomatis:
-- menjalankan `scripts/freeradius_aaa/prepare.sh` saat pertama kali
-  (kalau `output/freeradius_aaa/raddb` belum ada),
-- start FreeRADIUS di UDP/3812 untuk durasi mode 3 lalu mematikannya,
-- panggil `scripts/merge_benchmarks.py --result-dir output/result`
-  setelah ketiga mode selesai.
-
-Tunable lewat env var (sama di kedua sisi):
-
-```bash
-ITER=10 CRYPTO_ITER=10 MTU=512 EAP_METHOD=57 ./build/responder 15000
-ITER=10 CRYPTO_ITER=10 MTU=512 EAP_METHOD=57 ./build/initiator 127.0.0.1 15000
-```
-
-Flag opsional:
-- `SKIP_FREERADIUS=1` (responder) - jangan start FreeRADIUS, gunakan
-  yang sudah jalan.
-- `START_DELAY=2` (initiator) - jeda antar mode, naikkan kalau
-  responder lambat siap.
-- `AAA_PORT=3812` (responder) - port UDP FreeRADIUS.
-
-Hasil akhir:
-- Per-mode CSV mentah di `output/detail/*.csv`.
-- File gabungan ber-`;` di `output/result/*.csv` (lihat bagian 9).
+Ukuran yang masuk akal untuk percobaan: `MTU ∈ {128, 256, 512, 1020,
+1280, 1500}` — yang lain akan dibulatkan internal oleh layer EAP.
 
 ## 6. Run manual per mode (opsional)
 
@@ -325,8 +325,8 @@ Lihat bagian 6 ("Mode 3"). User PAP per section yang dibikin oleh
 
 ## 8. Run terdistribusi (Initiator di Raspberry Pi, Responder di server)
 
-Sama persis dengan quickstart di bagian 5, hanya saja initiator memakai
-IP server (bukan `127.0.0.1`).
+Flow yang direkomendasikan adalah **manual via git** — lihat §3 untuk
+ringkasan 4 langkah. Detilnya:
 
 ```
 +-------------------+        EDHOC / EAP / RADIUS         +---------------+
@@ -338,9 +338,7 @@ IP server (bukan `127.0.0.1`).
                                                           +---------------+
 ```
 
-Langkah:
-
-1. **Build di kedua sisi** (clone + `make -j` di repo masing-masing).
+1. **Build di kedua sisi** (`git clone` + `make -j"$(nproc)"`).
    Pastikan versi PQClean/mbedTLS sama.
 2. **Buka firewall** di server untuk tiga port UDP berurutan
    (`<base_port>`, `<base_port>+1`, `<base_port>+2`).
@@ -356,35 +354,46 @@ Langkah:
    ITER=10 CRYPTO_ITER=10 ./build/initiator 192.168.1.10 15000
    ```
 
-5. **Kumpulkan CSV** untuk merge gabungan dua-sisi:
+5. **Push hasil dari initiator ke git**:
 
    ```bash
-   # Di server, salin CSV initiator dari Pi
-   scp pi@raspberrypi:edhoc/output/detail/*_initiator.csv server:edhoc/output/detail/
-   scp pi@raspberrypi:edhoc/output/detail/internal_test_vectors_sections*.csv server:edhoc/output/detail/
-   # Lalu re-merge
-   python3 scripts/merge_benchmarks.py --output-dir output/detail --result-dir output/result
+   # Di Raspberry Pi
+   git add output/detail
+   git commit -m "results initiator <hostname> <date>"
+   git push origin <branch>
    ```
 
-   (Wrapper sudah memanggil merger di tiap sisi, jadi `output/result/`
-   lokal sudah valid - tapi kolom `Initiator` di sisi server akan kosong
-   sampai Anda salin CSV initiator dari Pi.)
+   File hanya ber-suffix `_initiator.csv` jadi tidak akan menabrak
+   file `_responder.csv` di sisi server.
 
-6. **Catatan timing**: kolom `txrx_us` / `io_wait_us` akan ikut
-   mengukur RTT jaringan riil (bukan loopback), jadi jangan
-   bandingkan langsung dengan run loopback.
+6. **Pull + merge di server**:
+
+   ```bash
+   # Di server
+   git pull --rebase
+   python3 scripts/merge_benchmarks.py \
+       --output-dir output/detail --result-dir output/result
+   ```
+
+   `output/result/` di-gitignore sehingga tidak ikut menjadi sumber
+   konflik di pull berikutnya.
+
+7. **Catatan timing**: kolom `txrx_us` / `io_wait_us` ikut mengukur
+   RTT jaringan riil (bukan loopback), jadi jangan bandingkan langsung
+   dengan run loopback.
 
 ## 9. Gabungkan CSV per-mode menjadi satu file
 
-Wrapper `./build/responder` dan `./build/initiator` sudah memanggil ini
-secara otomatis dan menyimpan hasilnya di `output/result/`.
-Untuk run manual:
+**Wrapper TIDAK lagi memanggil merger otomatis** — ini sengaja, supaya
+file gabungan tidak menjadi sumber merge conflict di `git pull --rebase`
+antara dua host. `output/result/` ada di `.gitignore`.
+
+Jalankan manual setelah Anda menggabungkan CSV dari semua host
+(typical: pull dari initiator masuk ke server):
 
 ```bash
-python3 scripts/merge_benchmarks.py --result-dir output/result
-# atau dengan direktori berbeda:
-python3 scripts/merge_benchmarks.py --output-dir /path/to/output \
-                                    --result-dir /path/to/output/result
+python3 scripts/merge_benchmarks.py \
+    --output-dir output/detail --result-dir output/result
 ```
 
 Akan menghasilkan (semuanya pakai delimiter `;`):

@@ -101,10 +101,6 @@ start_freeradius
 run_step "Mode 3 (EAP + AAA hop)" \
     "$BUILD_DIR/p2p_eap_aaa_responder" "$PORT_AAA" "$ITER" "$CRYPTO_ITER" "$MTU" "$EAP_METHOD"
 
-# Merge per-mode CSVs into output/result/
-echo "[responder] === merging CSVs from $DETAIL_DIR into $RESULT_DIR ==="
-python3 "$REPO_ROOT/scripts/merge_benchmarks.py" \
-    --output-dir "$DETAIL_DIR" \
-    --result-dir "$RESULT_DIR"
-
-echo "[responder] DONE"
+echo "[responder] DONE - per-mode CSV ada di $DETAIL_DIR/"
+echo "[responder] (untuk file gabungan, jalankan setelah pull dari sisi initiator:"
+echo "[responder]   python3 scripts/merge_benchmarks.py --output-dir output/detail --result-dir output/result )"

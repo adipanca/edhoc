@@ -60,9 +60,6 @@ run_step "Mode 2 (EAP standalone)" \
 run_step "Mode 3 (EAP + AAA hop)" \
     "$BUILD_DIR/p2p_eap_aaa_initiator" "$RESP_IP" "$PORT_AAA" "$ITER" "$CRYPTO_ITER" "$MTU" "$EAP_METHOD"
 
-echo "[initiator] === merging CSVs from $DETAIL_DIR into $RESULT_DIR ==="
-python3 "$REPO_ROOT/scripts/merge_benchmarks.py" \
-    --output-dir "$DETAIL_DIR" \
-    --result-dir "$RESULT_DIR"
-
-echo "[initiator] DONE"
+echo "[initiator] DONE - per-mode CSV ada di $DETAIL_DIR/"
+echo "[initiator] (commit + push hasil ini, lalu di sisi responder pull dan jalankan:"
+echo "[initiator]   python3 scripts/merge_benchmarks.py --output-dir output/detail --result-dir output/result )"
