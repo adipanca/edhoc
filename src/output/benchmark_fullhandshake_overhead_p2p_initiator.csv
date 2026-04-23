@@ -1,6 +1,0 @@
-type,role,cpu_time_us,cpu_usage_percentage,memory_bytes,memory_us
-Section2,Initiator,6219.98,4.77,2740224,0.00
-Section32,Initiator,10217.48,4.68,2740224,0.00
-Section33,Initiator,6076.50,2.03,2740224,0.00
-Section34,Initiator,10584.67,2.78,2740224,0.00
-Section35,Initiator,7560.12,2.52,2740224,0.00

@@ -60,7 +60,8 @@ def merge_role_pair(out_dir: str,
                     type_col_label: str,
                     status_col_label: str,
                     role_col_label: str,
-                    fragmentation: bool = False) -> Optional[str]:
+                    fragmentation: bool = False,
+                    result_dir: Optional[str] = None) -> Optional[str]:
     """Merge files of the form ``{base}{suffix}_{role}.csv``.
 
     Layout assumption: every source CSV has either ``type,role,...`` (most
@@ -105,12 +106,13 @@ def merge_role_pair(out_dir: str,
 
     if not merged_rows:
         return None
-    out_path = os.path.join(out_dir, out_name)
+    target_dir = result_dir or out_dir
+    out_path = os.path.join(target_dir, out_name)
     write_merged(out_path, final_header, merged_rows)
     return out_path
 
 
-def merge_aaa_only(out_dir: str) -> Optional[str]:
+def merge_aaa_only(out_dir: str, result_dir: Optional[str] = None) -> Optional[str]:
     src = os.path.join(out_dir,
                        "benchmark_aaa_auth_p2p_eap_aaa_responder.csv")
     if not os.path.isfile(src):
@@ -118,7 +120,7 @@ def merge_aaa_only(out_dir: str) -> Optional[str]:
     header, rows = read_csv(src)
     if not header:
         return None
-    out = os.path.join(out_dir, "benchmark_aaa_auth_p2p_.csv")
+    out = os.path.join(result_dir or out_dir, "benchmark_aaa_auth_p2p_.csv")
     merged_header = [header[0], "status EAP", "role"] + header[1:]
     merged_rows = [[r[0], "AAA", "Responder"] + r[1:] for r in rows]
     write_merged(out, merged_header, merged_rows)
@@ -128,14 +130,17 @@ def merge_aaa_only(out_dir: str) -> Optional[str]:
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", "-o", default="output",
-                        help="Directory containing the per-mode CSVs and where "
-                             "the merged files are written (default: output)")
+                        help="Directory containing the per-mode CSVs (default: output)")
+    parser.add_argument("--result-dir", "-r", default=None,
+                        help="Where to write the merged files (default: same as --output-dir)")
     args = parser.parse_args(argv)
 
     out_dir = args.output_dir
     if not os.path.isdir(out_dir):
         print(f"error: output directory not found: {out_dir}", file=sys.stderr)
         return 2
+    result_dir = args.result_dir or out_dir
+    os.makedirs(result_dir, exist_ok=True)
 
     plan = [
         # base prefix, merged filename, type_label, status_label, role_label, frag?
@@ -155,21 +160,24 @@ def main(argv: list[str]) -> int:
 
     written: list[str] = []
     for base, out_name, t, s, r, frag in plan:
-        p = merge_role_pair(out_dir, base, out_name, t, s, r, fragmentation=frag)
+        p = merge_role_pair(out_dir, base, out_name, t, s, r,
+                            fragmentation=frag, result_dir=result_dir)
         if p:
             written.append(p)
 
     # Fragmentation only exists for EAP modes (no Non-EAP fragmentation file).
     p = merge_role_pair(out_dir, "benchmark_fragmentation",
                         "benchmark_fullhandshake_fragmentation_p2p_.csv",
-                        "section", "status EAP", "role", fragmentation=True)
+                        "section", "status EAP", "role",
+                        fragmentation=True, result_dir=result_dir)
     if p:
         written.append(p)
 
     # EAP keymat (initiator/responder per mode); has 'section,...' columns.
     p = merge_role_pair(out_dir, "benchmark_eap_keymat",
                         "benchmark_eap_keymat_.csv",
-                        "section", "status EAP", "role", fragmentation=True)
+                        "section", "status EAP", "role",
+                        fragmentation=True, result_dir=result_dir)
     if p:
         written.append(p)
 
@@ -188,11 +196,11 @@ def main(argv: list[str]) -> int:
         for r in rows:
             iv_rows.append([mode_label] + r)
     if iv_rows:
-        out = os.path.join(out_dir, "internal_test_vectors_sections_.csv")
+        out = os.path.join(result_dir, "internal_test_vectors_sections_.csv")
         write_merged(out, iv_header, iv_rows)
         written.append(out)
 
-    p = merge_aaa_only(out_dir)
+    p = merge_aaa_only(out_dir, result_dir=result_dir)
     if p:
         written.append(p)
 

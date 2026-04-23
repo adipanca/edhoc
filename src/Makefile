@@ -51,10 +51,17 @@ TARGET_EAP_RESPONDER     := $(BUILD_DIR)/p2p_eap_responder
 TARGET_EAP_AAA_INITIATOR := $(BUILD_DIR)/p2p_eap_aaa_initiator
 TARGET_EAP_AAA_RESPONDER := $(BUILD_DIR)/p2p_eap_aaa_responder
 
+# All-in-one wrapper scripts (run all 3 modes + merge CSVs).
+WRAPPER_INITIATOR := $(BUILD_DIR)/initiator
+WRAPPER_RESPONDER := $(BUILD_DIR)/responder
+WRAPPER_INITIATOR_SRC := $(ROOT)/scripts/run_all_initiator.sh
+WRAPPER_RESPONDER_SRC := $(ROOT)/scripts/run_all_responder.sh
+
 ALL_TARGETS := \
 	$(TARGET_INITIATOR) $(TARGET_RESPONDER) \
 	$(TARGET_EAP_INITIATOR) $(TARGET_EAP_RESPONDER) \
-	$(TARGET_EAP_AAA_INITIATOR) $(TARGET_EAP_AAA_RESPONDER)
+	$(TARGET_EAP_AAA_INITIATOR) $(TARGET_EAP_AAA_RESPONDER) \
+	$(WRAPPER_INITIATOR) $(WRAPPER_RESPONDER)
 
 all: $(ALL_TARGETS)
 
@@ -81,6 +88,16 @@ $(TARGET_EAP_AAA_INITIATOR): $(EAP_AAA_INITIATOR_OBJS)
 $(TARGET_EAP_AAA_RESPONDER): $(EAP_AAA_RESPONDER_OBJS)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $^ -o $@ $(LDFLAGS_COMMON)
+
+$(WRAPPER_INITIATOR): $(WRAPPER_INITIATOR_SRC)
+	@mkdir -p $(BUILD_DIR)
+	cp $< $@
+	chmod +x $@
+
+$(WRAPPER_RESPONDER): $(WRAPPER_RESPONDER_SRC)
+	@mkdir -p $(BUILD_DIR)
+	cp $< $@
+	chmod +x $@
 
 $(OBJ_DIR)/%.o: %.c
 	@mkdir -p $(dir $@)

@@ -148,55 +148,99 @@ sama, sehingga tidak ada duplikasi logic.
 
 Bersihkan artefak: `cd src && make clean`.
 
-## 5. Run mode 1 (Non-EAP)
+## 5. Quickstart - jalankan 3 mode dalam 1 perintah
 
-Argumen umum: `<port> <iter> <crypto_iter>`.
-- `iter` = jumlah handshake yang diukur per section.
-- `crypto_iter` = jumlah pengulangan untuk benchmark per-operasi kripto.
+Satu perintah `./build/responder` di sisi server dan satu perintah
+`./build/initiator` di sisi klien menjalankan **ketiga mode**
+(Non-EAP, EAP standalone, EAP+AAA) berurutan, lalu otomatis
+menggabungkan semua CSV ke `output/result/`.
 
-Terminal Responder:
+### Loopback (satu host)
+
+Terminal A (server):
+
+```bash
+./build/responder 15000
+```
+
+Terminal B (client):
+
+```bash
+./build/initiator 127.0.0.1 15000
+```
+
+Wrapper otomatis memakai port:
+- `15000` -> Non-EAP (`p2p_{initiator,responder}`)
+- `15001` -> EAP standalone (`p2p_eap_*`)
+- `15002` -> EAP + AAA (`p2p_eap_aaa_*`)
+
+Dan otomatis:
+- menjalankan `scripts/freeradius_aaa/prepare.sh` saat pertama kali
+  (kalau `output/freeradius_aaa/raddb` belum ada),
+- start FreeRADIUS di UDP/3812 untuk durasi mode 3 lalu mematikannya,
+- panggil `scripts/merge_benchmarks.py --result-dir output/result`
+  setelah ketiga mode selesai.
+
+Tunable lewat env var (sama di kedua sisi):
+
+```bash
+ITER=10 CRYPTO_ITER=10 MTU=512 EAP_METHOD=57 ./build/responder 15000
+ITER=10 CRYPTO_ITER=10 MTU=512 EAP_METHOD=57 ./build/initiator 127.0.0.1 15000
+```
+
+Flag opsional:
+- `SKIP_FREERADIUS=1` (responder) - jangan start FreeRADIUS, gunakan
+  yang sudah jalan.
+- `START_DELAY=2` (initiator) - jeda antar mode, naikkan kalau
+  responder lambat siap.
+- `AAA_PORT=3812` (responder) - port UDP FreeRADIUS.
+
+Hasil akhir:
+- Per-mode CSV tetap di `output/*.csv`.
+- File gabungan ber-`;` di `output/result/*.csv` (lihat bagian 9).
+
+## 6. Run manual per mode (opsional)
+
+Kalau ingin menjalankan satu mode saja, gunakan binary aslinya.
+
+### Mode 1 - Non-EAP
 
 ```bash
 ./build/p2p_responder 9090 5 5
-```
-
-Terminal Initiator:
-
-```bash
 ./build/p2p_initiator 127.0.0.1 9090 5 5
 ```
 
-Output:
-- `output/benchmark_crypto_{initiator,responder}.csv`
-- `output/benchmark_fullhandshake_operation_p2p_{initiator,responder}.csv`
-- `output/benchmark_fullhandshake_overhead_p2p_{initiator,responder}.csv`
-- `output/benchmark_fullhandshake_processing_p2p_{initiator,responder}.csv`
-- `output/internal_test_vectors_sections.csv`
-
-## 6. Run mode 2 (EAP standalone)
-
-Argumen tambahan: `<mtu> <eap_method_type>`.
-- `mtu` ukuran maksimum payload EAP (untuk fragmentasi).
-- `eap_method_type` default `57` (suggested di draft EAP-EDHOC).
-
-Terminal Responder:
+### Mode 2 - EAP standalone
 
 ```bash
 ./build/p2p_eap_responder 9095 5 5 256 57
-```
-
-Terminal Initiator:
-
-```bash
 ./build/p2p_eap_initiator 127.0.0.1 9095 5 5 256 57
 ```
 
-Output tambahan dibanding mode 1:
-- `output/benchmark_fragmentation_eap_{initiator,responder}.csv`
-- `output/benchmark_eap_keymat_{initiator,responder}.csv` (MSK/EMSK).
-- Versi EAP dari semua CSV mode 1 (`*_eap_*.csv`).
+### Mode 3 - EAP + AAA hop
 
-## 7. Run mode 3 (EAP + AAA, FreeRADIUS hop)
+Lihat bagian 7 untuk setup FreeRADIUS, kemudian:
+
+```bash
+./build/p2p_eap_aaa_responder 9097 5 5 256 57
+./build/p2p_eap_aaa_initiator 127.0.0.1 9097 5 5 256 57
+```
+
+Argumen umum: `<port|ip+port> <iter> <crypto_iter> [<mtu> <eap_method>]`.
+
+Output per-mode (sebelum merge):
+- `output/benchmark_crypto_{initiator,responder}.csv`
+- `output/benchmark_fullhandshake_{operation,overhead,processing}_p2p[_eap[_aaa]]_{initiator,responder}.csv`
+- `output/benchmark_fragmentation[_eap[_aaa]]_{initiator,responder}.csv` (mode 2 & 3)
+- `output/benchmark_eap_keymat[_eap[_aaa]]_{initiator,responder}.csv` (mode 2 & 3)
+- `output/internal_test_vectors_sections[_eap[_aaa]].csv`
+- `output/benchmark_aaa_auth_p2p_eap_aaa_responder.csv` (mode 3)
+
+## 7. Setup FreeRADIUS untuk mode AAA
+
+`./build/responder` mengurus ini secara otomatis. Bagian ini hanya
+relevan kalau Anda menjalankan binary mode 3 secara manual atau ingin
+mengontrol FreeRADIUS sendiri.
 
 ### 7.1 Siapkan FreeRADIUS sekali per workspace
 
@@ -229,28 +273,10 @@ Smoke test (opsional):
 # Harus melihat 'Received Access-Accept'.
 ```
 
-### 7.3 Jalankan benchmark
+### 7.3 Jalankan benchmark manual
 
-Terminal B (responder/NAS, jalankan dari root repo agar CSV ke
-`output/`):
-
-```bash
-./build/p2p_eap_aaa_responder 9097 5 5 256 57
-```
-
-Terminal C (initiator/supplicant):
-
-```bash
-./build/p2p_eap_aaa_initiator 127.0.0.1 9097 5 5 256 57
-```
-
-Output tambahan:
-- `output/benchmark_aaa_auth_p2p_eap_aaa_responder.csv` - kolom
-  `section, calls, accepts, rejects, errors, rtt_avg_us,
-  req_bytes_avg, resp_bytes_avg, total_bytes_avg`.
-- Versi `_aaa` dari semua CSV mode 2.
-
-User PAP per section yang dibikin oleh `prepare.sh`:
+Lihat bagian 6 ("Mode 3"). User PAP per section yang dibikin oleh
+`prepare.sh`:
 
 | Section   | User-Name        | Password    |
 | --------- | ---------------- | ----------- |
@@ -262,15 +288,16 @@ User PAP per section yang dibikin oleh `prepare.sh`:
 
 ## 8. Run terdistribusi (Initiator di Raspberry Pi, Responder di server)
 
-Skenario yang sering dipakai untuk mengukur biaya pada perangkat
-edge:
+Sama persis dengan quickstart di bagian 5, hanya saja initiator memakai
+IP server (bukan `127.0.0.1`).
 
 ```
 +-------------------+        EDHOC / EAP / RADIUS         +---------------+
 | Raspberry Pi      |  <----------------------------->    |  Server       |
-| p2p_eap_(aaa_)    |                                     |  p2p_eap_(aaa_) |
-| initiator         |                                     |  responder    |
-+-------------------+                                     |  freeradius   |
+| ./build/initiator |                                     | ./build/      |
+|   <server-ip>     |                                     |   responder   |
+|   <base_port>     |                                     |   <base_port> |
++-------------------+                                     |  + freeradius |
                                                           +---------------+
 ```
 
@@ -278,41 +305,33 @@ Langkah:
 
 1. **Build di kedua sisi** (clone + `make -j` di repo masing-masing).
    Pastikan versi PQClean/mbedTLS sama.
-2. **Buka firewall** di server untuk port handshake yang dipilih
-   (default `9090`/`9095`/`9097` UDP+TCP loopback - skema kita pakai
-   socket UDP, sesuaikan kalau Anda mengubah). Jika juga memakai
-   FreeRADIUS di server yang berbeda, buka port `3812/udp`.
-3. **Jalankan responder di server** (alamat misal `192.168.1.10`):
+2. **Buka firewall** di server untuk tiga port UDP berurutan
+   (`<base_port>`, `<base_port>+1`, `<base_port>+2`).
+3. **Server** (jalankan dari root repo):
 
    ```bash
-   # Mode 1
-   ./build/p2p_responder 9090 5 5
-   # Mode 2
-   ./build/p2p_eap_responder 9095 5 5 256 57
-   # Mode 3 (jangan lupa start FreeRADIUS dulu, lihat bagian 7)
-   ./build/p2p_eap_aaa_responder 9097 5 5 256 57
+   ITER=10 CRYPTO_ITER=10 ./build/responder 15000
    ```
 
-4. **Jalankan initiator di Raspberry Pi**, arahkan ke IP server:
+4. **Raspberry Pi**:
 
    ```bash
-   # Mode 1
-   ./build/p2p_initiator       192.168.1.10 9090 5 5
-   # Mode 2
-   ./build/p2p_eap_initiator   192.168.1.10 9095 5 5 256 57
-   # Mode 3
-   ./build/p2p_eap_aaa_initiator 192.168.1.10 9097 5 5 256 57
+   ITER=10 CRYPTO_ITER=10 ./build/initiator 192.168.1.10 15000
    ```
 
-5. **Kumpulkan CSV**: file `*_initiator.csv` ada di Pi
-   (`output/`), file `*_responder.csv` ada di server. Jangan lupa
-   `scp` ke satu host sebelum menjalankan
-   `scripts/merge_benchmarks.py`.
+5. **Kumpulkan CSV** untuk merge gabungan dua-sisi:
 
    ```bash
+   # Di server, salin CSV initiator dari Pi
    scp pi@raspberrypi:edhoc/output/*_initiator.csv server:edhoc/output/
    scp pi@raspberrypi:edhoc/output/internal_test_vectors_sections*.csv server:edhoc/output/
+   # Lalu re-merge
+   python3 scripts/merge_benchmarks.py --result-dir output/result
    ```
+
+   (Wrapper sudah memanggil merger di tiap sisi, jadi `output/result/`
+   lokal sudah valid - tapi kolom `Initiator` di sisi server akan kosong
+   sampai Anda salin CSV initiator dari Pi.)
 
 6. **Catatan timing**: kolom `txrx_us` / `io_wait_us` akan ikut
    mengukur RTT jaringan riil (bukan loopback), jadi jangan
@@ -320,12 +339,15 @@ Langkah:
 
 ## 9. Gabungkan CSV per-mode menjadi satu file
 
-Setelah ketiga mode sudah dijalankan dan CSV terkumpul di `output/`:
+Wrapper `./build/responder` dan `./build/initiator` sudah memanggil ini
+secara otomatis dan menyimpan hasilnya di `output/result/`.
+Untuk run manual:
 
 ```bash
-python3 scripts/merge_benchmarks.py
+python3 scripts/merge_benchmarks.py --result-dir output/result
 # atau dengan direktori berbeda:
-python3 scripts/merge_benchmarks.py --output-dir /path/to/output
+python3 scripts/merge_benchmarks.py --output-dir /path/to/output \
+                                    --result-dir /path/to/output/result
 ```
 
 Akan menghasilkan (semuanya pakai delimiter `;`):
