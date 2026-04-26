@@ -1,0 +1,212 @@
+Process 0 (that is, the initial process):
+{1}new skI_sig: sign_sk;
+{2}new skR_sig: sign_sk;
+{3}new skR_kem: kem_sk;
+{4}let pkI_sig: sign_pk = pk_sig(skI_sig) in
+{5}let pkR_sig: sign_pk = pk_sig(skR_sig) in
+{6}let pkR_kem: kem_pk = pk_kem(skR_kem) in
+{7}out(cPub, pkI_sig);
+{8}out(cPub, pkR_sig);
+{9}out(cPub, pkR_kem);
+(
+    {10}!
+    {11}let skI_sig_1: sign_sk = skI_sig in
+    {12}new sk_eph: kem_sk;
+    {13}let pk_eph: kem_pk = pk_kem(sk_eph) in
+    {14}new r_R: bitstring;
+    {15}let ct_R: kem_ct = kem_ct_f(pkR_kem,r_R) in
+    {16}let ss_R: kem_ss = kem_ss_f(pkR_kem,r_R) in
+    {17}let M1: bitstring = (METHOD,SUITES,pk2b(pk_eph),ct2b(ct_R),C_I,EAD1) in
+    {18}event S_STEP1_I_to_R(M1);
+    {19}out(cIN, (METHOD,SUITES,pk_eph,ct_R,C_I,EAD1));
+    {20}in(cIN, (ct_eph: kem_ct,CIPH2: bitstring));
+    {21}let ss_eph: kem_ss = kem_decaps(sk_eph,ct_eph) in
+    {22}let TH2: bitstring = H((ct2b(ct_eph),H(M1))) in
+    {23}let PRK_2e: bitstring = extract(TH2,ss2b(ss_eph)) in
+    {24}let KEYSTREAM2: bitstring = kdf(PRK_2e,L0,TH2) in
+    {25}let PT2: bitstring = stream_dec(KEYSTREAM2,CIPH2) in
+    {26}let (=C_R,=ID_CRED_R,MAC2_rcvd: bitstring,=EAD2) = PT2 in
+    {27}let SALT_3e2m: bitstring = kdf(PRK_2e,L1,TH2) in
+    {28}let PRK_3e2m: bitstring = extract(SALT_3e2m,ss2b(ss_R)) in
+    {29}let MAC2_exp: bitstring = kdf(PRK_3e2m,L2,(C_R,ID_CRED_R,TH2,EAD2)) in
+    {30}if (MAC2_rcvd = MAC2_exp) then
+    {31}event E_STEP2_R_to_I(MAC2_rcvd,(ct2b(ct_eph),CIPH2),TH2);
+    {32}let TH3: bitstring = H((TH2,PT2,ID_CRED_R)) in
+    {33}let K3: bitstring = kdf(PRK_3e2m,L3,TH3) in
+    {34}let IV3: bitstring = kdf(PRK_3e2m,L4,TH3) in
+    {35}let MAC3: bitstring = kdf(PRK_3e2m,L6,(ID_CRED_I,TH3,EAD3)) in
+    {36}let SIG3: sig = sign(skI_sig_1,(ID_CRED_I,TH3,EAD3,MAC3)) in
+    {37}let PT3: bitstring = (ID_CRED_I,SIG3,EAD3) in
+    {38}let M3: bitstring = aead_enc(K3,IV3,TH3,PT3) in
+    {39}event S_STEP3_I_to_R(MAC3,M3,TH3);
+    {40}out(cIN, M3);
+    {41}let TH4: bitstring = H((TH3,PT3,ID_CRED_I)) in
+    {42}let PRK_out: bitstring = kdf(PRK_3e2m,L7,TH4) in
+    {43}let MSK: bitstring = kdf(PRK_out,L_MSK,TH4) in
+    {44}out(cPub, senc(MSK,I));
+    {45}out(cPub, senc(MSK,app_data1))
+) | (
+    {46}!
+    {47}let skR_kem_1: kem_sk = skR_kem in
+    {48}let skR_sig_1: sign_sk = skR_sig in
+    {49}in(cIN, (=METHOD,=SUITES,pk_eph_1: kem_pk,ct_R_1: kem_ct,=C_I,=EAD1));
+    {50}let M1_1: bitstring = (METHOD,SUITES,pk2b(pk_eph_1),ct2b(ct_R_1),C_I,EAD1) in
+    {51}event E_STEP1_I_to_R(M1_1);
+    {52}let ss_R_1: kem_ss = kem_decaps(skR_kem_1,ct_R_1) in
+    {53}new r_eph: bitstring;
+    {54}let ct_eph_1: kem_ct = kem_ct_f(pk_eph_1,r_eph) in
+    {55}let ss_eph_1: kem_ss = kem_ss_f(pk_eph_1,r_eph) in
+    {56}let TH2_1: bitstring = H((ct2b(ct_eph_1),H(M1_1))) in
+    {57}let PRK_2e_1: bitstring = extract(TH2_1,ss2b(ss_eph_1)) in
+    {58}let KEYSTREAM2_1: bitstring = kdf(PRK_2e_1,L0,TH2_1) in
+    {59}let SALT_3e2m_1: bitstring = kdf(PRK_2e_1,L1,TH2_1) in
+    {60}let PRK_3e2m_1: bitstring = extract(SALT_3e2m_1,ss2b(ss_R_1)) in
+    {61}let MAC2: bitstring = kdf(PRK_3e2m_1,L2,(C_R,ID_CRED_R,TH2_1,EAD2)) in
+    {62}let PT2_1: bitstring = (C_R,ID_CRED_R,MAC2,EAD2) in
+    {63}let CIPH2_1: bitstring = stream_enc(KEYSTREAM2_1,PT2_1) in
+    {64}event S_STEP2_R_to_I(MAC2,(ct2b(ct_eph_1),CIPH2_1),TH2_1);
+    {65}out(cIN, (ct_eph_1,CIPH2_1));
+    {66}in(cIN, M3_1: bitstring);
+    {67}let TH3_1: bitstring = H((TH2_1,PT2_1,ID_CRED_R)) in
+    {68}let K3_1: bitstring = kdf(PRK_3e2m_1,L3,TH3_1) in
+    {69}let IV3_1: bitstring = kdf(PRK_3e2m_1,L4,TH3_1) in
+    {70}let PT3_1: bitstring = aead_dec(K3_1,IV3_1,TH3_1,M3_1) in
+    {71}let (=ID_CRED_I,sig3: sig,=EAD3) = PT3_1 in
+    {72}let MAC3_exp: bitstring = kdf(PRK_3e2m_1,L6,(ID_CRED_I,TH3_1,EAD3)) in
+    {73}if (sverify(pkI_sig,(ID_CRED_I,TH3_1,EAD3,MAC3_exp),sig3) = true) then
+    {74}event E_STEP3_I_to_R(MAC3_exp,M3_1,TH3_1);
+    {75}let TH4_1: bitstring = H((TH3_1,PT3_1,ID_CRED_I)) in
+    {76}let K4: bitstring = kdf(PRK_3e2m_1,L8,TH4_1) in
+    {77}let IV4: bitstring = kdf(PRK_3e2m_1,L9,TH4_1) in
+    {78}let M4: bitstring = aead_enc(K4,IV4,TH4_1,EAD4) in
+    {79}out(cIN, M4);
+    {80}let PRK_out_1: bitstring = kdf(PRK_3e2m_1,L7,TH4_1) in
+    {81}let MSK_1: bitstring = kdf(PRK_out_1,L_MSK,TH4_1) in
+    {82}out(cPub, senc(MSK_1,R));
+    {83}out(cPub, senc(MSK_1,app_data2));
+    {84}event AAA_Request(RAD_USER);
+    {85}out(cNA, (RAD_USER,RAD_PASS));
+    {86}in(cNA, (=RAD_ACCEPT,u: bitstring));
+    {87}if (u = RAD_USER) then
+    {88}event AAA_Accept(RAD_USER)
+) | (
+    {89}!
+    {90}in(cNA, (u_1: bitstring,p: bitstring));
+    {91}if ((u_1 = RAD_USER) && (p = RAD_PASS)) then
+    {92}out(cNA, (RAD_ACCEPT,u_1))
+)
+
+--  Process 1 (that is, process 0, with let moved downwards):
+{1}new skI_sig: sign_sk;
+{2}new skR_sig: sign_sk;
+{3}new skR_kem: kem_sk;
+{4}let pkI_sig: sign_pk = pk_sig(skI_sig) in
+{7}out(cPub, pkI_sig);
+{5}let pkR_sig: sign_pk = pk_sig(skR_sig) in
+{8}out(cPub, pkR_sig);
+{6}let pkR_kem: kem_pk = pk_kem(skR_kem) in
+{9}out(cPub, pkR_kem);
+(
+    {10}!
+    {12}new sk_eph: kem_sk;
+    {14}new r_R: bitstring;
+    {15}let ct_R: kem_ct = kem_ct_f(pkR_kem,r_R) in
+    {13}let pk_eph: kem_pk = pk_kem(sk_eph) in
+    {17}let M1: bitstring = (METHOD,SUITES,pk2b(pk_eph),ct2b(ct_R),C_I,EAD1) in
+    {18}event S_STEP1_I_to_R(M1);
+    {19}out(cIN, (METHOD,SUITES,pk_eph,ct_R,C_I,EAD1));
+    {20}in(cIN, (ct_eph: kem_ct,CIPH2: bitstring));
+    {21}let ss_eph: kem_ss = kem_decaps(sk_eph,ct_eph) in
+    {22}let TH2: bitstring = H((ct2b(ct_eph),H(M1))) in
+    {23}let PRK_2e: bitstring = extract(TH2,ss2b(ss_eph)) in
+    {24}let KEYSTREAM2: bitstring = kdf(PRK_2e,L0,TH2) in
+    {25}let PT2: bitstring = stream_dec(KEYSTREAM2,CIPH2) in
+    {26}let (=C_R,=ID_CRED_R,MAC2_rcvd: bitstring,=EAD2) = PT2 in
+    {27}let SALT_3e2m: bitstring = kdf(PRK_2e,L1,TH2) in
+    {16}let ss_R: kem_ss = kem_ss_f(pkR_kem,r_R) in
+    {28}let PRK_3e2m: bitstring = extract(SALT_3e2m,ss2b(ss_R)) in
+    {29}let MAC2_exp: bitstring = kdf(PRK_3e2m,L2,(C_R,ID_CRED_R,TH2,EAD2)) in
+    {30}if (MAC2_rcvd = MAC2_exp) then
+    {31}event E_STEP2_R_to_I(MAC2_rcvd,(ct2b(ct_eph),CIPH2),TH2);
+    {32}let TH3: bitstring = H((TH2,PT2,ID_CRED_R)) in
+    {35}let MAC3: bitstring = kdf(PRK_3e2m,L6,(ID_CRED_I,TH3,EAD3)) in
+    {11}let skI_sig_1: sign_sk = skI_sig in
+    {36}let SIG3: sig = sign(skI_sig_1,(ID_CRED_I,TH3,EAD3,MAC3)) in
+    {37}let PT3: bitstring = (ID_CRED_I,SIG3,EAD3) in
+    {34}let IV3: bitstring = kdf(PRK_3e2m,L4,TH3) in
+    {33}let K3: bitstring = kdf(PRK_3e2m,L3,TH3) in
+    {38}let M3: bitstring = aead_enc(K3,IV3,TH3,PT3) in
+    {39}event S_STEP3_I_to_R(MAC3,M3,TH3);
+    {40}out(cIN, M3);
+    {41}let TH4: bitstring = H((TH3,PT3,ID_CRED_I)) in
+    {42}let PRK_out: bitstring = kdf(PRK_3e2m,L7,TH4) in
+    {43}let MSK: bitstring = kdf(PRK_out,L_MSK,TH4) in
+    {44}out(cPub, senc(MSK,I));
+    {45}out(cPub, senc(MSK,app_data1))
+) | (
+    {46}!
+    {49}in(cIN, (=METHOD,=SUITES,pk_eph_1: kem_pk,ct_R_1: kem_ct,=C_I,=EAD1));
+    {50}let M1_1: bitstring = (METHOD,SUITES,pk2b(pk_eph_1),ct2b(ct_R_1),C_I,EAD1) in
+    {51}event E_STEP1_I_to_R(M1_1);
+    {47}let skR_kem_1: kem_sk = skR_kem in
+    {52}let ss_R_1: kem_ss = kem_decaps(skR_kem_1,ct_R_1) in
+    {53}new r_eph: bitstring;
+    {54}let ct_eph_1: kem_ct = kem_ct_f(pk_eph_1,r_eph) in
+    {56}let TH2_1: bitstring = H((ct2b(ct_eph_1),H(M1_1))) in
+    {55}let ss_eph_1: kem_ss = kem_ss_f(pk_eph_1,r_eph) in
+    {57}let PRK_2e_1: bitstring = extract(TH2_1,ss2b(ss_eph_1)) in
+    {59}let SALT_3e2m_1: bitstring = kdf(PRK_2e_1,L1,TH2_1) in
+    {60}let PRK_3e2m_1: bitstring = extract(SALT_3e2m_1,ss2b(ss_R_1)) in
+    {61}let MAC2: bitstring = kdf(PRK_3e2m_1,L2,(C_R,ID_CRED_R,TH2_1,EAD2)) in
+    {62}let PT2_1: bitstring = (C_R,ID_CRED_R,MAC2,EAD2) in
+    {58}let KEYSTREAM2_1: bitstring = kdf(PRK_2e_1,L0,TH2_1) in
+    {63}let CIPH2_1: bitstring = stream_enc(KEYSTREAM2_1,PT2_1) in
+    {64}event S_STEP2_R_to_I(MAC2,(ct2b(ct_eph_1),CIPH2_1),TH2_1);
+    {65}out(cIN, (ct_eph_1,CIPH2_1));
+    {66}in(cIN, M3_1: bitstring);
+    {67}let TH3_1: bitstring = H((TH2_1,PT2_1,ID_CRED_R)) in
+    {69}let IV3_1: bitstring = kdf(PRK_3e2m_1,L4,TH3_1) in
+    {68}let K3_1: bitstring = kdf(PRK_3e2m_1,L3,TH3_1) in
+    {70}let PT3_1: bitstring = aead_dec(K3_1,IV3_1,TH3_1,M3_1) in
+    {71}let (=ID_CRED_I,sig3: sig,=EAD3) = PT3_1 in
+    {72}let MAC3_exp: bitstring = kdf(PRK_3e2m_1,L6,(ID_CRED_I,TH3_1,EAD3)) in
+    {73}if (sverify(pkI_sig,(ID_CRED_I,TH3_1,EAD3,MAC3_exp),sig3) = true) then
+    {74}event E_STEP3_I_to_R(MAC3_exp,M3_1,TH3_1);
+    {75}let TH4_1: bitstring = H((TH3_1,PT3_1,ID_CRED_I)) in
+    {77}let IV4: bitstring = kdf(PRK_3e2m_1,L9,TH4_1) in
+    {76}let K4: bitstring = kdf(PRK_3e2m_1,L8,TH4_1) in
+    {78}let M4: bitstring = aead_enc(K4,IV4,TH4_1,EAD4) in
+    {79}out(cIN, M4);
+    {80}let PRK_out_1: bitstring = kdf(PRK_3e2m_1,L7,TH4_1) in
+    {81}let MSK_1: bitstring = kdf(PRK_out_1,L_MSK,TH4_1) in
+    {82}out(cPub, senc(MSK_1,R));
+    {83}out(cPub, senc(MSK_1,app_data2));
+    {84}event AAA_Request(RAD_USER);
+    {85}out(cNA, (RAD_USER,RAD_PASS));
+    {86}in(cNA, (=RAD_ACCEPT,u: bitstring));
+    {87}if (u = RAD_USER) then
+    {88}event AAA_Accept(RAD_USER)
+) | (
+    {89}!
+    {90}in(cNA, (u_1: bitstring,p: bitstring));
+    {91}if ((u_1 = RAD_USER) && (p = RAD_PASS)) then
+    {92}out(cNA, (RAD_ACCEPT,u_1))
+)
+
+-- Query inj-event(E_STEP1_I_to_R(m)) ==> inj-event(S_STEP1_I_to_R(m)) in process 1.
+Translating the process into Horn clauses...
+Completing...
+200 rules inserted. Base: 159 rules (79 with conclusion selected). Queue: 26 rules.
+400 rules inserted. Base: 257 rules (99 with conclusion selected). Queue: 57 rules.
+600 rules inserted. Base: 332 rules (110 with conclusion selected). Queue: 96 rules.
+800 rules inserted. Base: 444 rules (118 with conclusion selected). Queue: 84 rules.
+1000 rules inserted. Base: 498 rules (130 with conclusion selected). Queue: 53 rules.
+1200 rules inserted. Base: 581 rules (146 with conclusion selected). Queue: 52 rules.
+1400 rules inserted. Base: 659 rules (162 with conclusion selected). Queue: 49 rules.
+1600 rules inserted. Base: 737 rules (178 with conclusion selected). Queue: 48 rules.
+1800 rules inserted. Base: 815 rules (194 with conclusion selected). Queue: 47 rules.
+2000 rules inserted. Base: 896 rules (210 with conclusion selected). Queue: 45 rules.
+2200 rules inserted. Base: 976 rules (226 with conclusion selected). Queue: 44 rules.
+2400 rules inserted. Base: 1054 rules (243 with conclusion selected). Queue: 43 rules.
+2600 rules inserted. Base: 1129 rules (259 with conclusion selected). Queue: 40 rules.
+2800 rules inserted. Base: 1208 rules (275 with conclusion selected). Queue: 40 rules.

@@ -1,0 +1,521 @@
+Process 0 (that is, the initial process):
+{1}new skI_sig: sign_sk;
+{2}new skI_kem: kem_sk;
+{3}new skR_sig: sign_sk;
+{4}new skR_kem: kem_sk;
+{5}let pkI_sig: sign_pk = pk_sig(skI_sig) in
+{6}let pkI_kem: kem_pk = pk_kem(skI_kem) in
+{7}let pkR_sig: sign_pk = pk_sig(skR_sig) in
+{8}let pkR_kem: kem_pk = pk_kem(skR_kem) in
+{9}out(cPub, pkI_sig);
+{10}out(cPub, pkI_kem);
+{11}out(cPub, pkR_sig);
+{12}out(cPub, pkR_kem);
+(
+    {13}!
+    {14}let skI_sig_1: sign_sk = skI_sig in
+    {15}let skI_kem_1: kem_sk = skI_kem in
+    {16}new sk_eph: kem_sk;
+    {17}let pk_eph: kem_pk = pk_kem(sk_eph) in
+    {18}let M1: bitstring = (METHOD,SUITES,pk2b(pk_eph),C_I,EAD1) in
+    {19}event S_STEP1_I_to_R(M1);
+    {20}out(cIN, (METHOD,SUITES,pk_eph,C_I,EAD1));
+    {21}in(cIN, (ct_eph: kem_ct,CIPH2: bitstring));
+    {22}let ss_eph: kem_ss = kem_decaps(sk_eph,ct_eph) in
+    {23}let TH2: bitstring = H((ct2b(ct_eph),H(M1))) in
+    {24}let PRK_2e: bitstring = extract(TH2,ss2b(ss_eph)) in
+    {25}let KEYSTREAM2: bitstring = kdf(PRK_2e,L0,TH2) in
+    {26}let PT2: bitstring = stream_dec(KEYSTREAM2,CIPH2) in
+    {27}let (=C_R,=ID_CRED_R,=TH2,=EAD2) = PT2 in
+    {28}event E_STEP2_R_to_I(EAD2,(ct2b(ct_eph),CIPH2),TH2);
+    {29}new r_R: bitstring;
+    {30}let ct_R: kem_ct = kem_ct_f(pkR_kem,r_R) in
+    {31}let ss_R: kem_ss = kem_ss_f(pkR_kem,r_R) in
+    {32}let SALT_3e2m: bitstring = kdf(PRK_2e,L1,TH2) in
+    {33}let PRK_3e2m: bitstring = extract(SALT_3e2m,ss2b(ss_R)) in
+    {34}let TH3: bitstring = H((TH2,PT2,ID_CRED_R)) in
+    {35}let K3: bitstring = kdf(PRK_3e2m,L3,TH3) in
+    {36}let IV3: bitstring = kdf(PRK_3e2m,L4,TH3) in
+    {37}let SIG3: sig = sign(skI_sig_1,(ID_CRED_I,TH3,EAD3)) in
+    {38}let PT3: bitstring = (ID_CRED_I,TH3,EAD3,SIG3) in
+    {39}let CIPH3: bitstring = aead_enc(K3,IV3,TH3,PT3) in
+    {40}let M3: bitstring = (ct_R,CIPH3) in
+    {41}event S_STEP3_I_to_R(sig2b(SIG3),(ct2b(ct_R),CIPH3),TH3);
+    {42}out(cIN, M3);
+    {43}in(cIN, (ct_I: kem_ct,CIPH4: bitstring));
+    {44}let ss_I: kem_ss = kem_decaps(skI_kem_1,ct_I) in
+    {45}let TH4: bitstring = H((TH3,PT3,ID_CRED_I)) in
+    {46}let SALT_4e3m: bitstring = kdf(PRK_3e2m,L5,TH4) in
+    {47}let PRK_4e3m: bitstring = extract(SALT_4e3m,ss2b(ss_I)) in
+    {48}let K4: bitstring = kdf(PRK_4e3m,L8,TH4) in
+    {49}let IV4: bitstring = kdf(PRK_4e3m,L9,TH4) in
+    {50}let pt4: bitstring = aead_dec(K4,IV4,TH4,CIPH4) in
+    {51}let (=EAD4,MAC2_rcvd: bitstring) = pt4 in
+    {52}let MAC2_exp: bitstring = kdf(PRK_4e3m,L2,(C_R,ID_CRED_R,TH4,EAD4)) in
+    {53}if (MAC2_rcvd = MAC2_exp) then
+    {54}let PRK_out: bitstring = kdf(PRK_4e3m,L7,TH4) in
+    {55}let MSK: bitstring = kdf(PRK_out,L_MSK,TH4) in
+    {56}out(cPub, senc(MSK,I));
+    {57}out(cPub, senc(MSK,app_data1))
+) | (
+    {58}!
+    {59}let skR_kem_1: kem_sk = skR_kem in
+    {60}let skR_sig_1: sign_sk = skR_sig in
+    {61}in(cIN, (=METHOD,=SUITES,pk_eph_1: kem_pk,=C_I,=EAD1));
+    {62}let M1_1: bitstring = (METHOD,SUITES,pk2b(pk_eph_1),C_I,EAD1) in
+    {63}event E_STEP1_I_to_R(M1_1);
+    {64}new r_eph: bitstring;
+    {65}let ct_eph_1: kem_ct = kem_ct_f(pk_eph_1,r_eph) in
+    {66}let ss_eph_1: kem_ss = kem_ss_f(pk_eph_1,r_eph) in
+    {67}let TH2_1: bitstring = H((ct2b(ct_eph_1),H(M1_1))) in
+    {68}let PRK_2e_1: bitstring = extract(TH2_1,ss2b(ss_eph_1)) in
+    {69}let KEYSTREAM2_1: bitstring = kdf(PRK_2e_1,L0,TH2_1) in
+    {70}let PT2_1: bitstring = (C_R,ID_CRED_R,TH2_1,EAD2) in
+    {71}let CIPH2_1: bitstring = stream_enc(KEYSTREAM2_1,PT2_1) in
+    {72}event S_STEP2_R_to_I(EAD2,(ct2b(ct_eph_1),CIPH2_1),TH2_1);
+    {73}out(cIN, (ct_eph_1,CIPH2_1));
+    {74}in(cIN, (ct_R_1: kem_ct,CIPH3_1: bitstring));
+    {75}let ss_R_1: kem_ss = kem_decaps(skR_kem_1,ct_R_1) in
+    {76}let SALT_3e2m_1: bitstring = kdf(PRK_2e_1,L1,TH2_1) in
+    {77}let PRK_3e2m_1: bitstring = extract(SALT_3e2m_1,ss2b(ss_R_1)) in
+    {78}let TH3_1: bitstring = H((TH2_1,PT2_1,ID_CRED_R)) in
+    {79}let K3_1: bitstring = kdf(PRK_3e2m_1,L3,TH3_1) in
+    {80}let IV3_1: bitstring = kdf(PRK_3e2m_1,L4,TH3_1) in
+    {81}let PT3_1: bitstring = aead_dec(K3_1,IV3_1,TH3_1,CIPH3_1) in
+    {82}let (=ID_CRED_I,=TH3_1,=EAD3,sig3: sig) = PT3_1 in
+    {83}if (sverify(pkI_sig,(ID_CRED_I,TH3_1,EAD3),sig3) = true) then
+    {84}event E_STEP3_I_to_R(sig2b(sig3),(ct2b(ct_R_1),CIPH3_1),TH3_1);
+    {85}new r_I: bitstring;
+    {86}let ct_I_1: kem_ct = kem_ct_f(pkI_kem,r_I) in
+    {87}let ss_I_1: kem_ss = kem_ss_f(pkI_kem,r_I) in
+    {88}let TH4_1: bitstring = H((TH3_1,PT3_1,ID_CRED_I)) in
+    {89}let SALT_4e3m_1: bitstring = kdf(PRK_3e2m_1,L5,TH4_1) in
+    {90}let PRK_4e3m_1: bitstring = extract(SALT_4e3m_1,ss2b(ss_I_1)) in
+    {91}let K4_1: bitstring = kdf(PRK_4e3m_1,L8,TH4_1) in
+    {92}let IV4_1: bitstring = kdf(PRK_4e3m_1,L9,TH4_1) in
+    {93}let MAC2def: bitstring = kdf(PRK_4e3m_1,L2,(C_R,ID_CRED_R,TH4_1,EAD4)) in
+    {94}let CIPH4_1: bitstring = aead_enc(K4_1,IV4_1,TH4_1,(EAD4,MAC2def)) in
+    {95}out(cIN, (ct_I_1,CIPH4_1));
+    {96}let PRK_out_1: bitstring = kdf(PRK_4e3m_1,L7,TH4_1) in
+    {97}let MSK_1: bitstring = kdf(PRK_out_1,L_MSK,TH4_1) in
+    {98}out(cPub, senc(MSK_1,R));
+    {99}out(cPub, senc(MSK_1,app_data2));
+    {100}event AAA_Request(RAD_USER);
+    {101}out(cNA, (RAD_USER,RAD_PASS));
+    {102}in(cNA, (u: bitstring,ok: bitstring));
+    {103}if ((u = RAD_USER) && (ok = RAD_PASS)) then
+    {104}event AAA_Accept(RAD_USER)
+) | (
+    {105}!
+    {106}in(cNA, (u_1: bitstring,p: bitstring));
+    {107}if ((u_1 = RAD_USER) && (p = RAD_PASS)) then
+    {108}out(cNA, (u_1,p))
+)
+
+--  Process 1 (that is, process 0, with let moved downwards):
+{1}new skI_sig: sign_sk;
+{2}new skI_kem: kem_sk;
+{3}new skR_sig: sign_sk;
+{4}new skR_kem: kem_sk;
+{5}let pkI_sig: sign_pk = pk_sig(skI_sig) in
+{9}out(cPub, pkI_sig);
+{6}let pkI_kem: kem_pk = pk_kem(skI_kem) in
+{10}out(cPub, pkI_kem);
+{7}let pkR_sig: sign_pk = pk_sig(skR_sig) in
+{11}out(cPub, pkR_sig);
+{8}let pkR_kem: kem_pk = pk_kem(skR_kem) in
+{12}out(cPub, pkR_kem);
+(
+    {13}!
+    {16}new sk_eph: kem_sk;
+    {17}let pk_eph: kem_pk = pk_kem(sk_eph) in
+    {18}let M1: bitstring = (METHOD,SUITES,pk2b(pk_eph),C_I,EAD1) in
+    {19}event S_STEP1_I_to_R(M1);
+    {20}out(cIN, (METHOD,SUITES,pk_eph,C_I,EAD1));
+    {21}in(cIN, (ct_eph: kem_ct,CIPH2: bitstring));
+    {22}let ss_eph: kem_ss = kem_decaps(sk_eph,ct_eph) in
+    {23}let TH2: bitstring = H((ct2b(ct_eph),H(M1))) in
+    {24}let PRK_2e: bitstring = extract(TH2,ss2b(ss_eph)) in
+    {25}let KEYSTREAM2: bitstring = kdf(PRK_2e,L0,TH2) in
+    {26}let PT2: bitstring = stream_dec(KEYSTREAM2,CIPH2) in
+    {27}let (=C_R,=ID_CRED_R,=TH2,=EAD2) = PT2 in
+    {28}event E_STEP2_R_to_I(EAD2,(ct2b(ct_eph),CIPH2),TH2);
+    {29}new r_R: bitstring;
+    {34}let TH3: bitstring = H((TH2,PT2,ID_CRED_R)) in
+    {14}let skI_sig_1: sign_sk = skI_sig in
+    {37}let SIG3: sig = sign(skI_sig_1,(ID_CRED_I,TH3,EAD3)) in
+    {38}let PT3: bitstring = (ID_CRED_I,TH3,EAD3,SIG3) in
+    {32}let SALT_3e2m: bitstring = kdf(PRK_2e,L1,TH2) in
+    {31}let ss_R: kem_ss = kem_ss_f(pkR_kem,r_R) in
+    {33}let PRK_3e2m: bitstring = extract(SALT_3e2m,ss2b(ss_R)) in
+    {36}let IV3: bitstring = kdf(PRK_3e2m,L4,TH3) in
+    {35}let K3: bitstring = kdf(PRK_3e2m,L3,TH3) in
+    {39}let CIPH3: bitstring = aead_enc(K3,IV3,TH3,PT3) in
+    {30}let ct_R: kem_ct = kem_ct_f(pkR_kem,r_R) in
+    {41}event S_STEP3_I_to_R(sig2b(SIG3),(ct2b(ct_R),CIPH3),TH3);
+    {40}let M3: bitstring = (ct_R,CIPH3) in
+    {42}out(cIN, M3);
+    {43}in(cIN, (ct_I: kem_ct,CIPH4: bitstring));
+    {15}let skI_kem_1: kem_sk = skI_kem in
+    {44}let ss_I: kem_ss = kem_decaps(skI_kem_1,ct_I) in
+    {45}let TH4: bitstring = H((TH3,PT3,ID_CRED_I)) in
+    {46}let SALT_4e3m: bitstring = kdf(PRK_3e2m,L5,TH4) in
+    {47}let PRK_4e3m: bitstring = extract(SALT_4e3m,ss2b(ss_I)) in
+    {49}let IV4: bitstring = kdf(PRK_4e3m,L9,TH4) in
+    {48}let K4: bitstring = kdf(PRK_4e3m,L8,TH4) in
+    {50}let pt4: bitstring = aead_dec(K4,IV4,TH4,CIPH4) in
+    {51}let (=EAD4,MAC2_rcvd: bitstring) = pt4 in
+    {52}let MAC2_exp: bitstring = kdf(PRK_4e3m,L2,(C_R,ID_CRED_R,TH4,EAD4)) in
+    {53}if (MAC2_rcvd = MAC2_exp) then
+    {54}let PRK_out: bitstring = kdf(PRK_4e3m,L7,TH4) in
+    {55}let MSK: bitstring = kdf(PRK_out,L_MSK,TH4) in
+    {56}out(cPub, senc(MSK,I));
+    {57}out(cPub, senc(MSK,app_data1))
+) | (
+    {58}!
+    {61}in(cIN, (=METHOD,=SUITES,pk_eph_1: kem_pk,=C_I,=EAD1));
+    {62}let M1_1: bitstring = (METHOD,SUITES,pk2b(pk_eph_1),C_I,EAD1) in
+    {63}event E_STEP1_I_to_R(M1_1);
+    {64}new r_eph: bitstring;
+    {65}let ct_eph_1: kem_ct = kem_ct_f(pk_eph_1,r_eph) in
+    {67}let TH2_1: bitstring = H((ct2b(ct_eph_1),H(M1_1))) in
+    {70}let PT2_1: bitstring = (C_R,ID_CRED_R,TH2_1,EAD2) in
+    {66}let ss_eph_1: kem_ss = kem_ss_f(pk_eph_1,r_eph) in
+    {68}let PRK_2e_1: bitstring = extract(TH2_1,ss2b(ss_eph_1)) in
+    {69}let KEYSTREAM2_1: bitstring = kdf(PRK_2e_1,L0,TH2_1) in
+    {71}let CIPH2_1: bitstring = stream_enc(KEYSTREAM2_1,PT2_1) in
+    {72}event S_STEP2_R_to_I(EAD2,(ct2b(ct_eph_1),CIPH2_1),TH2_1);
+    {73}out(cIN, (ct_eph_1,CIPH2_1));
+    {74}in(cIN, (ct_R_1: kem_ct,CIPH3_1: bitstring));
+    {59}let skR_kem_1: kem_sk = skR_kem in
+    {75}let ss_R_1: kem_ss = kem_decaps(skR_kem_1,ct_R_1) in
+    {78}let TH3_1: bitstring = H((TH2_1,PT2_1,ID_CRED_R)) in
+    {76}let SALT_3e2m_1: bitstring = kdf(PRK_2e_1,L1,TH2_1) in
+    {77}let PRK_3e2m_1: bitstring = extract(SALT_3e2m_1,ss2b(ss_R_1)) in
+    {80}let IV3_1: bitstring = kdf(PRK_3e2m_1,L4,TH3_1) in
+    {79}let K3_1: bitstring = kdf(PRK_3e2m_1,L3,TH3_1) in
+    {81}let PT3_1: bitstring = aead_dec(K3_1,IV3_1,TH3_1,CIPH3_1) in
+    {82}let (=ID_CRED_I,=TH3_1,=EAD3,sig3: sig) = PT3_1 in
+    {83}if (sverify(pkI_sig,(ID_CRED_I,TH3_1,EAD3),sig3) = true) then
+    {84}event E_STEP3_I_to_R(sig2b(sig3),(ct2b(ct_R_1),CIPH3_1),TH3_1);
+    {85}new r_I: bitstring;
+    {88}let TH4_1: bitstring = H((TH3_1,PT3_1,ID_CRED_I)) in
+    {89}let SALT_4e3m_1: bitstring = kdf(PRK_3e2m_1,L5,TH4_1) in
+    {87}let ss_I_1: kem_ss = kem_ss_f(pkI_kem,r_I) in
+    {90}let PRK_4e3m_1: bitstring = extract(SALT_4e3m_1,ss2b(ss_I_1)) in
+    {93}let MAC2def: bitstring = kdf(PRK_4e3m_1,L2,(C_R,ID_CRED_R,TH4_1,EAD4)) in
+    {92}let IV4_1: bitstring = kdf(PRK_4e3m_1,L9,TH4_1) in
+    {91}let K4_1: bitstring = kdf(PRK_4e3m_1,L8,TH4_1) in
+    {94}let CIPH4_1: bitstring = aead_enc(K4_1,IV4_1,TH4_1,(EAD4,MAC2def)) in
+    {86}let ct_I_1: kem_ct = kem_ct_f(pkI_kem,r_I) in
+    {95}out(cIN, (ct_I_1,CIPH4_1));
+    {96}let PRK_out_1: bitstring = kdf(PRK_4e3m_1,L7,TH4_1) in
+    {97}let MSK_1: bitstring = kdf(PRK_out_1,L_MSK,TH4_1) in
+    {98}out(cPub, senc(MSK_1,R));
+    {99}out(cPub, senc(MSK_1,app_data2));
+    {100}event AAA_Request(RAD_USER);
+    {101}out(cNA, (RAD_USER,RAD_PASS));
+    {102}in(cNA, (u: bitstring,ok: bitstring));
+    {103}if ((u = RAD_USER) && (ok = RAD_PASS)) then
+    {104}event AAA_Accept(RAD_USER)
+) | (
+    {105}!
+    {106}in(cNA, (u_1: bitstring,p: bitstring));
+    {107}if ((u_1 = RAD_USER) && (p = RAD_PASS)) then
+    {108}out(cNA, (u_1,p))
+)
+
+-- Query inj-event(E_STEP1_I_to_R(m)) ==> inj-event(S_STEP1_I_to_R(m)) in process 1.
+Translating the process into Horn clauses...
+Completing...
+200 rules inserted. Base: 168 rules (69 with conclusion selected). Queue: 17 rules.
+Starting query inj-event(E_STEP1_I_to_R(m)) ==> inj-event(S_STEP1_I_to_R(m))
+goal reachable: attacker(pk_eph_2) -> inj-event(E_STEP1_I_to_R((METHOD[],SUITES[],pk2b(pk_eph_2),C_I[],EAD1[])),@occ63_1)
+Abbreviations:
+@occ63_1 = @occ63[pk_eph_1 = pk_eph_2,!1 = @sid]
+
+Derivation:
+Abbreviations:
+@occ63_1 = @occ63[pk_eph_1 = pk_eph_2,!1 = @sid]
+
+1. The attacker initially knows EAD1[].
+attacker(EAD1[]).
+
+2. The attacker initially knows C_I[].
+attacker(C_I[]).
+
+3. We assume as hypothesis that
+attacker(pk_eph_2).
+
+4. The attacker initially knows SUITES[].
+attacker(SUITES[]).
+
+5. The attacker initially knows METHOD[].
+attacker(METHOD[]).
+
+6. By 5, the attacker may know METHOD[].
+By 4, the attacker may know SUITES[].
+By 3, the attacker may know pk_eph_2.
+By 2, the attacker may know C_I[].
+By 1, the attacker may know EAD1[].
+Using the function 5-tuple the attacker may obtain (METHOD[],SUITES[],pk_eph_2,C_I[],EAD1[]).
+attacker((METHOD[],SUITES[],pk_eph_2,C_I[],EAD1[])).
+
+7. The message (METHOD[],SUITES[],pk_eph_2,C_I[],EAD1[]) that the attacker may have by 6 may be received at input {61}.
+So event E_STEP1_I_to_R((METHOD[],SUITES[],pk2b(pk_eph_2),C_I[],EAD1[])) may be executed at {63} in session @sid.
+inj-event(E_STEP1_I_to_R((METHOD[],SUITES[],pk2b(pk_eph_2),C_I[],EAD1[])),@occ63_1).
+
+8. By 7, inj-event(E_STEP1_I_to_R((METHOD[],SUITES[],pk2b(pk_eph_2),C_I[],EAD1[])),@occ63_1).
+The goal is reached, represented in the following fact:
+inj-event(E_STEP1_I_to_R((METHOD[],SUITES[],pk2b(pk_eph_2),C_I[],EAD1[])),@occ63_1).
+
+
+A more detailed output of the traces is available with
+  set traceDisplay = long.
+
+new skI_sig: sign_sk creating skI_sig_2 at {1}
+
+new skI_kem: kem_sk creating skI_kem_2 at {2}
+
+new skR_sig: sign_sk creating skR_sig_2 at {3}
+
+new skR_kem: kem_sk creating skR_kem_2 at {4}
+
+out(cPub, ~M) with ~M = pk_sig(skI_sig_2) at {9}
+
+out(cPub, ~M_1) with ~M_1 = pk_kem(skI_kem_2) at {10}
+
+out(cPub, ~M_2) with ~M_2 = pk_sig(skR_sig_2) at {11}
+
+out(cPub, ~M_3) with ~M_3 = pk_kem(skR_kem_2) at {12}
+
+in(cIN, (METHOD,SUITES,a,C_I,EAD1)) at {61} in copy a_1
+
+event E_STEP1_I_to_R((METHOD,SUITES,pk2b(a),C_I,EAD1)) at {63} in copy a_1 (goal)
+
+The event E_STEP1_I_to_R((METHOD,SUITES,pk2b(a),C_I,EAD1)) is executed at {63} in copy a_1.
+A trace has been found.
+RESULT inj-event(E_STEP1_I_to_R(m)) ==> inj-event(S_STEP1_I_to_R(m)) is false.
+RESULT (even event(E_STEP1_I_to_R(m)) ==> event(S_STEP1_I_to_R(m)) is false.)
+-- Query inj-event(E_STEP2_R_to_I(mac,msg,th)) ==> inj-event(S_STEP2_R_to_I(mac,msg,th)) in process 1.
+Translating the process into Horn clauses...
+Completing...
+200 rules inserted. Base: 166 rules (69 with conclusion selected). Queue: 16 rules.
+400 rules inserted. Base: 300 rules (74 with conclusion selected). Queue: 11 rules.
+Starting query inj-event(E_STEP2_R_to_I(mac,msg,th)) ==> inj-event(S_STEP2_R_to_I(mac,msg,th))
+goal reachable: attacker(r) -> inj-event(E_STEP2_R_to_I(EAD2[],(ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),stream_enc(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r))),L0,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]))),H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),@occ28_1)
+Abbreviations:
+sk_eph_1 = sk_eph[!1 = @sid]
+@occ28_1 = @occ28[CIPH2 = stream_enc(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r))),L0,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[])),ct_eph = kem_ct_f(pk_kem(sk_eph_1),r),!1 = @sid]
+
+Derivation:
+Abbreviations:
+sk_eph_1 = sk_eph[!1 = @sid]
+@occ28_1 = @occ28[CIPH2 = stream_enc(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r))),L0,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[])),ct_eph = kem_ct_f(pk_kem(sk_eph_1),r),!1 = @sid]
+
+1. The attacker initially knows EAD2[].
+attacker(EAD2[]).
+
+2. The attacker initially knows EAD1[].
+attacker(EAD1[]).
+
+3. The attacker initially knows C_I[].
+attacker(C_I[]).
+
+4. The message (METHOD[],SUITES[],pk_kem(sk_eph_1),C_I[],EAD1[]) may be sent to the attacker at output {20}.
+attacker((METHOD[],SUITES[],pk_kem(sk_eph_1),C_I[],EAD1[])).
+
+5. By 4, the attacker may know (METHOD[],SUITES[],pk_kem(sk_eph_1),C_I[],EAD1[]).
+Using the function 3-proj-5-tuple the attacker may obtain pk_kem(sk_eph_1).
+attacker(pk_kem(sk_eph_1)).
+
+6. By 5, the attacker may know pk_kem(sk_eph_1).
+Using the function pk2b the attacker may obtain pk2b(pk_kem(sk_eph_1)).
+attacker(pk2b(pk_kem(sk_eph_1))).
+
+7. The attacker initially knows SUITES[].
+attacker(SUITES[]).
+
+8. The attacker initially knows METHOD[].
+attacker(METHOD[]).
+
+9. By 8, the attacker may know METHOD[].
+By 7, the attacker may know SUITES[].
+By 6, the attacker may know pk2b(pk_kem(sk_eph_1)).
+By 3, the attacker may know C_I[].
+By 2, the attacker may know EAD1[].
+Using the function 5-tuple the attacker may obtain (METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]).
+attacker((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])).
+
+10. By 9, the attacker may know (METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]).
+Using the function H the attacker may obtain H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])).
+attacker(H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))).
+
+11. We assume as hypothesis that
+attacker(r).
+
+12. By 5, the attacker may know pk_kem(sk_eph_1).
+By 11, the attacker may know r.
+Using the function kem_ct_f the attacker may obtain kem_ct_f(pk_kem(sk_eph_1),r).
+attacker(kem_ct_f(pk_kem(sk_eph_1),r)).
+
+13. By 12, the attacker may know kem_ct_f(pk_kem(sk_eph_1),r).
+Using the function ct2b the attacker may obtain ct2b(kem_ct_f(pk_kem(sk_eph_1),r)).
+attacker(ct2b(kem_ct_f(pk_kem(sk_eph_1),r))).
+
+14. By 13, the attacker may know ct2b(kem_ct_f(pk_kem(sk_eph_1),r)).
+By 10, the attacker may know H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])).
+Using the function 2-tuple the attacker may obtain (ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))).
+attacker((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))).
+
+15. By 14, the attacker may know (ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))).
+Using the function H the attacker may obtain H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))).
+attacker(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))).
+
+16. The attacker initially knows ID_CRED_R[].
+attacker(ID_CRED_R[]).
+
+17. The attacker initially knows C_R[].
+attacker(C_R[]).
+
+18. By 17, the attacker may know C_R[].
+By 16, the attacker may know ID_CRED_R[].
+By 15, the attacker may know H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))).
+By 1, the attacker may know EAD2[].
+Using the function 4-tuple the attacker may obtain (C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]).
+attacker((C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[])).
+
+19. Using the function L0 the attacker may obtain L0.
+attacker(L0).
+
+20. By 5, the attacker may know pk_kem(sk_eph_1).
+By 11, the attacker may know r.
+Using the function kem_ss_f the attacker may obtain kem_ss_f(pk_kem(sk_eph_1),r).
+attacker(kem_ss_f(pk_kem(sk_eph_1),r)).
+
+21. By 20, the attacker may know kem_ss_f(pk_kem(sk_eph_1),r).
+Using the function ss2b the attacker may obtain ss2b(kem_ss_f(pk_kem(sk_eph_1),r)).
+attacker(ss2b(kem_ss_f(pk_kem(sk_eph_1),r))).
+
+22. By 15, the attacker may know H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))).
+By 21, the attacker may know ss2b(kem_ss_f(pk_kem(sk_eph_1),r)).
+Using the function extract the attacker may obtain extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r))).
+attacker(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r)))).
+
+23. By 22, the attacker may know extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r))).
+By 19, the attacker may know L0.
+By 15, the attacker may know H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))).
+Using the function kdf the attacker may obtain kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r))),L0,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))).
+attacker(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r))),L0,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))))).
+
+24. By 23, the attacker may know kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r))),L0,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))).
+By 18, the attacker may know (C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]).
+Using the function stream_enc the attacker may obtain stream_enc(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r))),L0,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[])).
+attacker(stream_enc(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r))),L0,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]))).
+
+25. By 12, the attacker may know kem_ct_f(pk_kem(sk_eph_1),r).
+By 24, the attacker may know stream_enc(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r))),L0,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[])).
+Using the function 2-tuple the attacker may obtain (kem_ct_f(pk_kem(sk_eph_1),r),stream_enc(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r))),L0,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]))).
+attacker((kem_ct_f(pk_kem(sk_eph_1),r),stream_enc(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r))),L0,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[])))).
+
+26. The message (kem_ct_f(pk_kem(sk_eph_1),r),stream_enc(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r))),L0,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]))) that the attacker may have by 25 may be received at input {21}.
+So event E_STEP2_R_to_I(EAD2[],(ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),stream_enc(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r))),L0,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]))),H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))) may be executed at {28} in session @sid.
+inj-event(E_STEP2_R_to_I(EAD2[],(ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),stream_enc(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r))),L0,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]))),H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),@occ28_1).
+
+27. By 26, inj-event(E_STEP2_R_to_I(EAD2[],(ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),stream_enc(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r))),L0,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]))),H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),@occ28_1).
+The goal is reached, represented in the following fact:
+inj-event(E_STEP2_R_to_I(EAD2[],(ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),stream_enc(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r))),L0,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]))),H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),@occ28_1).
+
+
+A more detailed output of the traces is available with
+  set traceDisplay = long.
+
+new skI_sig: sign_sk creating skI_sig_2 at {1}
+
+new skI_kem: kem_sk creating skI_kem_2 at {2}
+
+new skR_sig: sign_sk creating skR_sig_2 at {3}
+
+new skR_kem: kem_sk creating skR_kem_2 at {4}
+
+out(cPub, ~M) with ~M = pk_sig(skI_sig_2) at {9}
+
+out(cPub, ~M_1) with ~M_1 = pk_kem(skI_kem_2) at {10}
+
+out(cPub, ~M_2) with ~M_2 = pk_sig(skR_sig_2) at {11}
+
+out(cPub, ~M_3) with ~M_3 = pk_kem(skR_kem_2) at {12}
+
+new sk_eph: kem_sk creating sk_eph_2 at {16} in copy a
+
+event S_STEP1_I_to_R((METHOD,SUITES,pk2b(pk_kem(sk_eph_2)),C_I,EAD1)) at {19} in copy a
+
+out(cIN, (~M_4,~M_5,~M_6,~M_7,~M_8)) with ~M_4 = METHOD, ~M_5 = SUITES, ~M_6 = pk_kem(sk_eph_2), ~M_7 = C_I, ~M_8 = EAD1 at {20} in copy a
+
+in(cIN, (kem_ct_f(~M_6,a_1),stream_enc(kdf(extract(H((ct2b(kem_ct_f(~M_6,a_1)),H((METHOD,SUITES,pk2b(~M_6),C_I,EAD1)))),ss2b(kem_ss_f(~M_6,a_1))),L0,H((ct2b(kem_ct_f(~M_6,a_1)),H((METHOD,SUITES,pk2b(~M_6),C_I,EAD1))))),(C_R,ID_CRED_R,H((ct2b(kem_ct_f(~M_6,a_1)),H((METHOD,SUITES,pk2b(~M_6),C_I,EAD1)))),EAD2)))) with kem_ct_f(~M_6,a_1) = kem_ct_f(pk_kem(sk_eph_2),a_1), stream_enc(kdf(extract(H((ct2b(kem_ct_f(~M_6,a_1)),H((METHOD,SUITES,pk2b(~M_6),C_I,EAD1)))),ss2b(kem_ss_f(~M_6,a_1))),L0,H((ct2b(kem_ct_f(~M_6,a_1)),H((METHOD,SUITES,pk2b(~M_6),C_I,EAD1))))),(C_R,ID_CRED_R,H((ct2b(kem_ct_f(~M_6,a_1)),H((METHOD,SUITES,pk2b(~M_6),C_I,EAD1)))),EAD2)) = stream_enc(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_2),a_1)),H((METHOD,SUITES,pk2b(pk_kem(sk_eph_2)),C_I,EAD1)))),ss2b(kem_ss_f(pk_kem(sk_eph_2),a_1))),L0,H((ct2b(kem_ct_f(pk_kem(sk_eph_2),a_1)),H((METHOD,SUITES,pk2b(pk_kem(sk_eph_2)),C_I,EAD1))))),(C_R,ID_CRED_R,H((ct2b(kem_ct_f(pk_kem(sk_eph_2),a_1)),H((METHOD,SUITES,pk2b(pk_kem(sk_eph_2)),C_I,EAD1)))),EAD2)) at {21} in copy a
+
+event E_STEP2_R_to_I(EAD2,(ct2b(kem_ct_f(pk_kem(sk_eph_2),a_1)),stream_enc(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_2),a_1)),H((METHOD,SUITES,pk2b(pk_kem(sk_eph_2)),C_I,EAD1)))),ss2b(kem_ss_f(pk_kem(sk_eph_2),a_1))),L0,H((ct2b(kem_ct_f(pk_kem(sk_eph_2),a_1)),H((METHOD,SUITES,pk2b(pk_kem(sk_eph_2)),C_I,EAD1))))),(C_R,ID_CRED_R,H((ct2b(kem_ct_f(pk_kem(sk_eph_2),a_1)),H((METHOD,SUITES,pk2b(pk_kem(sk_eph_2)),C_I,EAD1)))),EAD2))),H((ct2b(kem_ct_f(pk_kem(sk_eph_2),a_1)),H((METHOD,SUITES,pk2b(pk_kem(sk_eph_2)),C_I,EAD1))))) at {28} in copy a (goal)
+
+The event E_STEP2_R_to_I(EAD2,(ct2b(kem_ct_f(pk_kem(sk_eph_2),a_1)),stream_enc(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_2),a_1)),H((METHOD,SUITES,pk2b(pk_kem(sk_eph_2)),C_I,EAD1)))),ss2b(kem_ss_f(pk_kem(sk_eph_2),a_1))),L0,H((ct2b(kem_ct_f(pk_kem(sk_eph_2),a_1)),H((METHOD,SUITES,pk2b(pk_kem(sk_eph_2)),C_I,EAD1))))),(C_R,ID_CRED_R,H((ct2b(kem_ct_f(pk_kem(sk_eph_2),a_1)),H((METHOD,SUITES,pk2b(pk_kem(sk_eph_2)),C_I,EAD1)))),EAD2))),H((ct2b(kem_ct_f(pk_kem(sk_eph_2),a_1)),H((METHOD,SUITES,pk2b(pk_kem(sk_eph_2)),C_I,EAD1))))) is executed at {28} in copy a.
+A trace has been found.
+RESULT inj-event(E_STEP2_R_to_I(mac,msg,th)) ==> inj-event(S_STEP2_R_to_I(mac,msg,th)) is false.
+RESULT (even event(E_STEP2_R_to_I(mac,msg,th)) ==> event(S_STEP2_R_to_I(mac,msg,th)) is false.)
+-- Query inj-event(E_STEP3_I_to_R(mac,msg,th)) ==> inj-event(S_STEP3_I_to_R(mac,msg,th)) in process 1.
+Translating the process into Horn clauses...
+Completing...
+200 rules inserted. Base: 166 rules (69 with conclusion selected). Queue: 16 rules.
+400 rules inserted. Base: 305 rules (73 with conclusion selected). Queue: 19 rules.
+Starting query inj-event(E_STEP3_I_to_R(mac,msg,th)) ==> inj-event(S_STEP3_I_to_R(mac,msg,th))
+goal reachable: b-inj-event(S_STEP3_I_to_R(sig2b(sign(skI_sig[],(ID_CRED_I[],H((H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]),ID_CRED_R[])),EAD3[]))),(ct2b(kem_ct_f(pk_kem(skR_kem[]),r_R_1)),aead_enc(kdf(extract(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r_eph_1))),L1,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),ss2b(kem_ss_f(pk_kem(skR_kem[]),r_R_1))),L3,H((H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]),ID_CRED_R[]))),kdf(extract(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r_eph_1))),L1,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),ss2b(kem_ss_f(pk_kem(skR_kem[]),r_R_1))),L4,H((H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]),ID_CRED_R[]))),H((H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]),ID_CRED_R[])),(ID_CRED_I[],H((H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]),ID_CRED_R[])),EAD3[],sign(skI_sig[],(ID_CRED_I[],H((H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]),ID_CRED_R[])),EAD3[]))))),H((H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]),ID_CRED_R[]))),@occ41_1) -> inj-event(E_STEP3_I_to_R(sig2b(sign(skI_sig[],(ID_CRED_I[],H((H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]),ID_CRED_R[])),EAD3[]))),(ct2b(kem_ct_f(pk_kem(skR_kem[]),r_R_1)),aead_enc(kdf(extract(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r_eph_1))),L1,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),ss2b(kem_ss_f(pk_kem(skR_kem[]),r_R_1))),L3,H((H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]),ID_CRED_R[]))),kdf(extract(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r_eph_1))),L1,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),ss2b(kem_ss_f(pk_kem(skR_kem[]),r_R_1))),L4,H((H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]),ID_CRED_R[]))),H((H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]),ID_CRED_R[])),(ID_CRED_I[],H((H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]),ID_CRED_R[])),EAD3[],sign(skI_sig[],(ID_CRED_I[],H((H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]),ID_CRED_R[])),EAD3[]))))),H((H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]),ID_CRED_R[]))),@occ84_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+sk_eph_1 = sk_eph[!1 = @sid]
+r_eph_1 = r_eph[pk_eph_1 = pk_kem(sk_eph_1),!1 = @sid_1]
+r_R_1 = r_R[CIPH2 = stream_enc(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r_eph_1))),L0,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[])),ct_eph = kem_ct_f(pk_kem(sk_eph_1),r_eph_1),!1 = @sid]
+@occ84_1 = @occ84[CIPH3_1 = aead_enc(kdf(extract(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r_eph_1))),L1,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),ss2b(kem_ss_f(pk_kem(skR_kem[]),r_R_1))),L3,H((H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]),ID_CRED_R[]))),kdf(extract(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r_eph_1))),L1,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),ss2b(kem_ss_f(pk_kem(skR_kem[]),r_R_1))),L4,H((H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]),ID_CRED_R[]))),H((H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]),ID_CRED_R[])),(ID_CRED_I[],H((H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]),ID_CRED_R[])),EAD3[],sign(skI_sig[],(ID_CRED_I[],H((H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[]),ID_CRED_R[])),EAD3[])))),ct_R_1 = kem_ct_f(pk_kem(skR_kem[]),r_R_1),pk_eph_1 = pk_kem(sk_eph_1),!1 = @sid_1]
+@occ41_1 = @occ41[CIPH2 = stream_enc(kdf(extract(H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),ss2b(kem_ss_f(pk_kem(sk_eph_1),r_eph_1))),L0,H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[]))))),(C_R[],ID_CRED_R[],H((ct2b(kem_ct_f(pk_kem(sk_eph_1),r_eph_1)),H((METHOD[],SUITES[],pk2b(pk_kem(sk_eph_1)),C_I[],EAD1[])))),EAD2[])),ct_eph = kem_ct_f(pk_kem(sk_eph_1),r_eph_1),!1 = @sid]
+RESULT inj-event(E_STEP3_I_to_R(mac,msg,th)) ==> inj-event(S_STEP3_I_to_R(mac,msg,th)) is true.
+-- Query not attacker(I[]) in process 1.
+Translating the process into Horn clauses...
+Completing...
+200 rules inserted. Base: 162 rules (68 with conclusion selected). Queue: 16 rules.
+Starting query not attacker(I[])
+RESULT not attacker(I[]) is true.
+-- Query not attacker(R[]) in process 1.
+Translating the process into Horn clauses...
+Completing...
+200 rules inserted. Base: 162 rules (68 with conclusion selected). Queue: 16 rules.
+Starting query not attacker(R[])
+RESULT not attacker(R[]) is true.
+-- Query not attacker(app_data1[]) in process 1.
+Translating the process into Horn clauses...
+Completing...
+200 rules inserted. Base: 162 rules (68 with conclusion selected). Queue: 16 rules.
+Starting query not attacker(app_data1[])
+RESULT not attacker(app_data1[]) is true.
+-- Query not attacker(app_data2[]) in process 1.
+Translating the process into Horn clauses...
+Completing...
+200 rules inserted. Base: 162 rules (68 with conclusion selected). Queue: 16 rules.
+Starting query not attacker(app_data2[])
+RESULT not attacker(app_data2[]) is true.
+
+--------------------------------------------------------------
+Verification summary:
+
+Query inj-event(E_STEP1_I_to_R(m)) ==> inj-event(S_STEP1_I_to_R(m)) is false.
+
+Query inj-event(E_STEP2_R_to_I(mac,msg,th)) ==> inj-event(S_STEP2_R_to_I(mac,msg,th)) is false.
+
+Query inj-event(E_STEP3_I_to_R(mac,msg,th)) ==> inj-event(S_STEP3_I_to_R(mac,msg,th)) is true.
+
+Query not attacker(I[]) is true.
+
+Query not attacker(R[]) is true.
+
+Query not attacker(app_data1[]) is true.
+
+Query not attacker(app_data2[]) is true.
+
+--------------------------------------------------------------
+

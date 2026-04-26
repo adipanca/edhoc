@@ -1,0 +1,228 @@
+(* ============================================================================ *)
+(* EDHOC-PQ Section 3.5 (explicit R-auth via SIG_2; new ct_R in M3;            *)
+(*                       ct_I in M4 mandatory; SALT_4e3m from PRK_3e2m)        *)
+(* over EAP + RADIUS PAP -- 3-channel model.                                    *)
+(*                                                                              *)
+(* QUERY MAP (Tabel II)                                                         *)
+(*   Q1..Q7 active by default.                                                  *)
+(*   Q8  FS:  uncomment LeakFS(...) line in main process.                       *)
+(*   Q9  AEAD-key/IV reuse: uncomment [Q9 AEAD LEAK] inline blocks in roles.    *)
+(*   Q10 Quantum: uncomment [Q10 PQ LEAK] inline blocks in roles.               *)
+(* ============================================================================ *)
+
+free cIN  : channel.
+free cNA  : channel.
+free cPub : channel.
+
+type kem_pk. type kem_sk. type kem_ct. type kem_ss.
+type sign_pk. type sign_sk. type sig.
+type label.
+
+fun pk_kem(kem_sk): kem_pk.
+fun kem_ct_f(kem_pk, bitstring): kem_ct.
+fun kem_ss_f(kem_pk, bitstring): kem_ss.
+reduc forall sk: kem_sk, r: bitstring;
+      kem_decaps(sk, kem_ct_f(pk_kem(sk), r)) = kem_ss_f(pk_kem(sk), r).
+
+fun pk_sig(sign_sk): sign_pk.
+fun sign(sign_sk, bitstring): sig.
+reduc forall sk: sign_sk, m: bitstring;
+      sverify(pk_sig(sk), m, sign(sk, m)) = true.
+
+fun H(bitstring): bitstring.
+fun extract(bitstring, bitstring): bitstring.
+fun kdf(bitstring, label, bitstring): bitstring.
+const L0, L1, L2, L3, L4, L5, L6, L7, L8, L9, L_MSK, L_EMSK : label.
+
+fun aead_enc(bitstring, bitstring, bitstring, bitstring): bitstring.
+reduc forall k, iv, ad, m: bitstring;
+      aead_dec(k, iv, ad, aead_enc(k, iv, ad, m)) = m.
+fun stream_enc(bitstring, bitstring): bitstring.
+reduc forall k, m: bitstring; stream_dec(k, stream_enc(k, m)) = m.
+fun senc(bitstring, bitstring): bitstring.
+reduc forall k, m: bitstring; sdec(k, senc(k, m)) = m.
+
+fun ss2b (kem_ss):  bitstring.
+fun ct2b (kem_ct):  bitstring.
+fun pk2b (kem_pk):  bitstring.
+fun sig2b(sig):     bitstring.
+
+free METHOD, SUITES         : bitstring.
+free C_I, C_R               : bitstring.
+free EAD1, EAD2, EAD3, EAD4 : bitstring.
+free ID_CRED_I, ID_CRED_R   : bitstring.
+free I, R                   : bitstring [private].
+free app_data1, app_data2   : bitstring [private].
+free RAD_USER               : bitstring.    (* "edhoc_Section35" *)
+free RAD_PASS               : bitstring [private].
+
+event S_STEP1_I_to_R(bitstring).
+event E_STEP1_I_to_R(bitstring).
+event S_STEP2_R_to_I(bitstring, bitstring, bitstring).
+event E_STEP2_R_to_I(bitstring, bitstring, bitstring).
+event S_STEP3_I_to_R(bitstring, bitstring, bitstring).
+event E_STEP3_I_to_R(bitstring, bitstring, bitstring).
+event AAA_Request(bitstring).
+event AAA_Accept (bitstring).
+
+query m: bitstring;
+  inj-event(E_STEP1_I_to_R(m)) ==> inj-event(S_STEP1_I_to_R(m)).
+query mac:bitstring, msg:bitstring, th:bitstring;
+  inj-event(E_STEP2_R_to_I(mac,msg,th)) ==> inj-event(S_STEP2_R_to_I(mac,msg,th)).
+query mac:bitstring, msg:bitstring, th:bitstring;
+  inj-event(E_STEP3_I_to_R(mac,msg,th)) ==> inj-event(S_STEP3_I_to_R(mac,msg,th)).
+query attacker(I).
+query attacker(R).
+query attacker(app_data1).
+query attacker(app_data2).
+
+
+(* ====================================================================== *)
+(*  Initiator                                                              *)
+(* ====================================================================== *)
+let Initiator(skI_sig: sign_sk, skI_kem: kem_sk,
+              pkR_kem: kem_pk, pkR_sig: sign_pk) =
+  new sk_eph : kem_sk;
+  let pk_eph = pk_kem(sk_eph) in
+  let M1     = (METHOD, SUITES, pk2b(pk_eph), C_I, EAD1) in
+  event S_STEP1_I_to_R(M1);
+  out(cIN, (METHOD, SUITES, pk_eph, C_I, EAD1));
+
+  in(cIN, (ct_eph: kem_ct, CIPH2: bitstring));
+  let ss_eph    = kem_decaps(sk_eph, ct_eph) in
+  let TH2       = H((ct2b(ct_eph), H(M1))) in
+  let PRK_2e    = extract(TH2, ss2b(ss_eph)) in
+  let KEYSTREAM2= kdf(PRK_2e, L0, TH2) in
+  (* [Q9 AEAD LEAK] uncomment to leak EK2 from Initiator:
+     phase 1; out(cPub, KEYSTREAM2);  *)
+  let PT2_full  = stream_dec(KEYSTREAM2, CIPH2) in
+  let (=C_R, =ID_CRED_R, =TH2, =EAD2, sig2: sig) = PT2_full in
+  if sverify(pkR_sig, (C_R, ID_CRED_R, TH2, EAD2), sig2) = true then
+  event E_STEP2_R_to_I(sig2b(sig2), (ct2b(ct_eph), CIPH2), TH2);
+
+  new r_R       : bitstring;
+  (* [Q10 PQ LEAK] uncomment to leak Initiator KEM randomness:
+     phase 1; out(cPub, r_R);  *)
+  let ct_R      = kem_ct_f(pkR_kem, r_R) in
+  let ss_R      = kem_ss_f(pkR_kem, r_R) in
+  let SALT_3e2m = kdf(PRK_2e, L1, TH2) in
+  let PRK_3e2m  = extract(SALT_3e2m, ss2b(ss_R)) in
+  let TH3       = H((TH2, PT2_full, ID_CRED_R)) in
+  let K3        = kdf(PRK_3e2m, L3, TH3) in
+  let IV3       = kdf(PRK_3e2m, L4, TH3) in
+  let MAC3      = kdf(PRK_3e2m, L6, (ID_CRED_I, TH3, EAD3)) in
+  let SIG3      = sign(skI_sig, (ID_CRED_I, TH3, EAD3, MAC3)) in
+  let PT3       = (ID_CRED_I, SIG3, EAD3) in
+  let CIPH3     = aead_enc(K3, IV3, TH3, PT3) in
+  let M3        = (ct_R, CIPH3) in
+  event S_STEP3_I_to_R(MAC3, (ct2b(ct_R), CIPH3), TH3);
+  out(cIN, M3);
+
+  in(cIN, (ct_I: kem_ct, CIPH4: bitstring));
+  let ss_I       = kem_decaps(skI_kem, ct_I) in
+  let TH4        = H((TH3, PT3, ID_CRED_I)) in
+  let SALT_4e3m  = kdf(PRK_3e2m, L5, TH4) in
+  let PRK_4e3m   = extract(SALT_4e3m, ss2b(ss_I)) in
+  let K4         = kdf(PRK_4e3m, L8, TH4) in
+  let IV4        = kdf(PRK_4e3m, L9, TH4) in
+  let EAD4_rcvd  = aead_dec(K4, IV4, TH4, CIPH4) in
+  let PRK_out    = kdf(PRK_4e3m, L7, TH4) in
+  let MSK        = kdf(PRK_out, L_MSK, TH4) in
+  out(cPub, senc(MSK, I));
+  out(cPub, senc(MSK, app_data1)).
+
+
+(* ====================================================================== *)
+(*  Responder                                                              *)
+(* ====================================================================== *)
+let Responder(skR_kem: kem_sk, skR_sig: sign_sk,
+              pkI_sig: sign_pk, pkI_kem: kem_pk) =
+  in(cIN, (=METHOD, =SUITES, pk_eph: kem_pk, =C_I, =EAD1));
+  let M1 = (METHOD, SUITES, pk2b(pk_eph), C_I, EAD1) in
+  event E_STEP1_I_to_R(M1);
+
+  new r_eph  : bitstring;
+  (* [Q10 PQ LEAK] uncomment to leak Responder ephemeral randomness:
+     phase 1; out(cPub, r_eph);  *)
+  let ct_eph = kem_ct_f(pk_eph, r_eph) in
+  let ss_eph = kem_ss_f(pk_eph, r_eph) in
+  let TH2    = H((ct2b(ct_eph), H(M1))) in
+  let PRK_2e = extract(TH2, ss2b(ss_eph)) in
+  let KEYSTREAM2 = kdf(PRK_2e, L0, TH2) in
+  (* [Q9 AEAD LEAK] uncomment to leak EK2:
+     phase 1; out(cPub, KEYSTREAM2);  *)
+  let SIG2       = sign(skR_sig, (C_R, ID_CRED_R, TH2, EAD2)) in
+  let PT2_full   = (C_R, ID_CRED_R, TH2, EAD2, SIG2) in
+  let CIPH2      = stream_enc(KEYSTREAM2, PT2_full) in
+  event S_STEP2_R_to_I(sig2b(SIG2), (ct2b(ct_eph), CIPH2), TH2);
+  out(cIN, (ct_eph, CIPH2));
+
+  in(cIN, (ct_R: kem_ct, CIPH3: bitstring));
+  let ss_R       = kem_decaps(skR_kem, ct_R) in
+  let SALT_3e2m  = kdf(PRK_2e, L1, TH2) in
+  let PRK_3e2m   = extract(SALT_3e2m, ss2b(ss_R)) in
+  let TH3        = H((TH2, PT2_full, ID_CRED_R)) in
+  let K3         = kdf(PRK_3e2m, L3, TH3) in
+  let IV3        = kdf(PRK_3e2m, L4, TH3) in
+  let PT3        = aead_dec(K3, IV3, TH3, CIPH3) in
+  let (=ID_CRED_I, sig3: sig, =EAD3) = PT3 in
+  let MAC3_exp   = kdf(PRK_3e2m, L6, (ID_CRED_I, TH3, EAD3)) in
+  if sverify(pkI_sig, (ID_CRED_I, TH3, EAD3, MAC3_exp), sig3) = true then
+  event E_STEP3_I_to_R(MAC3_exp, (ct2b(ct_R), CIPH3), TH3);
+
+  new r_I        : bitstring;
+  let ct_I       = kem_ct_f(pkI_kem, r_I) in
+  let ss_I       = kem_ss_f(pkI_kem, r_I) in
+  let TH4        = H((TH3, PT3, ID_CRED_I)) in
+  let SALT_4e3m  = kdf(PRK_3e2m, L5, TH4) in
+  let PRK_4e3m   = extract(SALT_4e3m, ss2b(ss_I)) in
+  let K4         = kdf(PRK_4e3m, L8, TH4) in
+  let IV4        = kdf(PRK_4e3m, L9, TH4) in
+  let CIPH4      = aead_enc(K4, IV4, TH4, EAD4) in
+  out(cIN, (ct_I, CIPH4));
+  let PRK_out    = kdf(PRK_4e3m, L7, TH4) in
+  let MSK        = kdf(PRK_out, L_MSK, TH4) in
+  out(cPub, senc(MSK, R));
+  out(cPub, senc(MSK, app_data2));
+
+  event AAA_Request(RAD_USER);
+  out(cNA, (RAD_USER, RAD_PASS));
+  in (cNA, (u: bitstring, ok: bitstring));
+  if u = RAD_USER && ok = RAD_PASS then
+  event AAA_Accept(RAD_USER).
+
+
+let AAAServer() =
+  in(cNA, (u: bitstring, p: bitstring));
+  if u = RAD_USER && p = RAD_PASS then
+    out(cNA, (u, p)).
+
+
+(* Q8 FS LEAK -- leaks long-term keys in phase 1. *)
+let LeakFS(skI_sig: sign_sk, skI_kem: kem_sk,
+           skR_sig: sign_sk, skR_kem: kem_sk) =
+  phase 1;
+  out(cPub, skI_sig);
+  out(cPub, skI_kem);
+  out(cPub, skR_sig);
+  out(cPub, skR_kem).
+
+
+process
+  new skI_sig : sign_sk;
+  new skI_kem : kem_sk;
+  new skR_sig : sign_sk;
+  new skR_kem : kem_sk;
+  let pkI_sig = pk_sig(skI_sig) in
+  let pkI_kem = pk_kem(skI_kem) in
+  let pkR_sig = pk_sig(skR_sig) in
+  let pkR_kem = pk_kem(skR_kem) in
+  out(cPub, pkI_sig); out(cPub, pkI_kem);
+  out(cPub, pkR_sig); out(cPub, pkR_kem);
+  (
+      ( !  Initiator(skI_sig, skI_kem, pkR_kem, pkR_sig) )
+    | ( !  Responder(skR_kem, skR_sig, pkI_sig, pkI_kem) )
+    | ( !  AAAServer()                                    )
+    (* [Q8 FS LEAK] uncomment next line to enable Q8: *)
+    (* | LeakFS(skI_sig, skI_kem, skR_sig, skR_kem)         *)
+  )

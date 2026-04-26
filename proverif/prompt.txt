@@ -1,0 +1,280 @@
+buatkan saya proverif untuk ke 5 variant dari eapedhocpqserveraaa dengan menggunakan 3 channel seperti yang kita implementasikan di eap edhoc pq server AAA dan berikut algorithm nya : 
+\begin{algorithm}[H]
+\caption{Step 1 (Initiator) --- Prepare $M_1$}
+\label{alg:step1}
+\textbf{Input:} Longterm PQ key pair $(pk_I, sk_I)$; Responder's $\mathrm{kem.pk}_R$ (Sec.~2 only) \\
+\textbf{Output:} $M_1$
+\begin{algorithmic}[1]
+\Statex \textit{[All Sections]}
+\State $(\mathrm{kem.sk}_{\mathrm{eph}}, \mathrm{kem.pk}_{\mathrm{eph}}) \gets \mathbf{KEM.KeyGen}()$
+\Statex \textit{[Section 2 only]}
+\State $(\mathrm{ss}_R, \mathrm{kem.ct}_R) \gets \mathbf{KEM.Encaps}(\mathrm{kem.pk}_R)$
+\State $M_1 \gets (\mathrm{METHOD}, \mathrm{SUITES}_I, \mathrm{kem.pk}_{\mathrm{eph}}, \mathrm{kem.ct}_R, C_I, \mathrm{EAD}_1)$
+\Statex \textit{[Section 3.2, 3.3, 3.4, 3.5]}
+\State $M_1 \gets (\mathrm{METHOD}, \mathrm{SUITES}_I, \mathrm{kem.pk}_{\mathrm{eph}}, C_I, \mathrm{EAD}_1)$
+\State \Return $M_1$
+\end{algorithmic}
+\end{algorithm}
+
+
+% ============================================
+% STEP 2: RESPONDER — Process M1, Prepare M2
+% ============================================
+\begin{algorithm}[H]
+\caption{Step 2 (Responder) --- Process $M_1$ and Prepare $M_2$}
+\label{alg:step2}
+\textbf{Input:} $M_1$; Responder's long-term keys (KEM and/or signing, per section) \\
+\textbf{Output:} $M_2$
+\begin{algorithmic}[1]
+\Statex \textit{[All Sections]}
+\State $(\mathrm{ss}_{\mathrm{eph}}, \mathrm{kem.ct}_{\mathrm{eph}}) \gets \mathbf{KEM.Encaps}(\mathrm{kem.pk}_{\mathrm{eph}})$
+\State $TH_2 \gets H(\mathrm{kem.ct}_{\mathrm{eph}}, H(M_1))$
+\State $PRK_{2e} \gets \mathbf{EDHOC\text{-}Extract}(TH_2, \mathrm{ss}_{\mathrm{eph}})$
+\State $KEYSTREAM_2 \gets \mathbf{EDHOC\text{-}KDF}(PRK_{2e}, 0, TH_2)$
+\Statex \textit{[Section 2]} \Comment{implicit R-auth via $\mathrm{ss}_R$ from $M_1$}
+\State $\mathrm{ss}_R \gets \mathbf{KEM.Decaps}(\mathrm{kem.sk}_R, \mathrm{kem.ct}_R)$
+\State $SALT_{3e2m} \gets \mathbf{EDHOC\text{-}KDF}(PRK_{2e}, 1, TH_2)$
+\State $PRK_{3e2m} \gets \mathbf{EDHOC\text{-}Extract}(SALT_{3e2m}, \mathrm{ss}_R)$
+\State $MAC_2 \gets \mathbf{KDF}(PRK_{3e2m}, 2, (C_R, ID\_CRED_R, TH_2, \mathrm{EAD}_2))$
+\State $PLAINTEXT_2 \gets (C_R, ID\_CRED_R, MAC_2, \mathrm{EAD}_2)$
+\Statex \textit{[Section 3.2, 3.5]} \Comment{explicit R-auth via signature over $PLAINTEXT_2$}
+\State $PLAINTEXT_2 \gets (C_R, ID\_CRED_R, TH_2, \mathrm{EAD}_2)$
+\State $SIGNATURE_2 \gets \mathbf{DS.Sign}(\mathrm{sign.sk}_R, PLAINTEXT_2)$
+\State $PLAINTEXT_2 \gets (PLAINTEXT_2 \parallel SIGNATURE_2)$
+\Statex \textit{[Section 3.3]} \Comment{$MAC_2$ + signature over $MAC_2$, $MAC_2$ derived from $PRK_{2e}$}
+\State $MAC_2 \gets \mathbf{KDF}(PRK_{2e}, 2, (C_R, ID\_CRED_R, TH_2, \mathrm{EAD}_2))$
+\State $SIGNATURE_2 \gets \mathbf{DS.Sign}(\mathrm{sign.sk}_R, (C_R, ID\_CRED_R, TH_2, \mathrm{EAD}_2, MAC_2))$
+\State $PLAINTEXT_2 \gets (C_R, ID\_CRED_R, SIGNATURE_2, \mathrm{EAD}_2)$
+\Statex \textit{[Section 3.4]} \Comment{$MAC_2$ \emph{deferred} to $M_4$; $M_2$ carries no auth material}
+\State $PLAINTEXT_2 \gets (C_R, ID\_CRED_R, TH_2, \mathrm{EAD}_2)$
+\Statex \textit{[All Sections]}
+\State $CIPHERTEXT_2 \gets PLAINTEXT_2 \oplus KEYSTREAM_2$
+\State $M_2 \gets (\mathrm{kem.ct}_{\mathrm{eph}}, CIPHERTEXT_2)$
+\State \Return $M_2$
+\end{algorithmic}
+\end{algorithm}
+
+
+% ============================================
+% STEP 3: INITIATOR — Process M2, Prepare M3
+% ============================================
+\begin{algorithm}[H]
+\caption{Step 3 (Initiator) --- Process $M_2$ and Prepare $M_3$}
+\label{alg:step3}
+\textbf{Input:} $M_2$ \\
+\textbf{Output:} $M_3$
+\begin{algorithmic}[1]
+\Statex \textit{[All Sections]}
+\State $\mathrm{ss}_{\mathrm{eph}} \gets \mathbf{KEM.Decaps}(\mathrm{kem.sk}_{\mathrm{eph}}, \mathrm{kem.ct}_{\mathrm{eph}})$
+\State Compute $TH_2, PRK_{2e}, KEYSTREAM_2$ and recover $PLAINTEXT_2$
+\State $TH_3 \gets H(TH_2, PLAINTEXT_2, ID\_CRED_R)$
+\Statex \textit{[Section 2]} \Comment{verify $MAC_2 \Rightarrow$ implicit R-auth}
+\State $PRK_{3e2m} \gets \mathbf{EDHOC\text{-}Extract}(SALT_{3e2m}, \mathrm{ss}_R)$
+\State Verify $MAC_2 \stackrel{?}{=} \mathbf{KDF}(PRK_{3e2m}, 2, \cdot)$
+\State $(K_3, IV_3) \gets \mathbf{EDHOC\text{-}KDF}(PRK_{3e2m}, 3\text{/}4, TH_3)$
+\State $MAC_3 \gets \mathbf{KDF}(PRK_{3e2m}, 6, (ID\_CRED_I, TH_3, \mathrm{EAD}_3))$
+\State $SIGNATURE_3 \gets \mathbf{DS.Sign}(\mathrm{sign.sk}_I, (ID\_CRED_I, TH_3, \mathrm{EAD}_3, MAC_3))$
+\State $PLAINTEXT_3 \gets (ID\_CRED_I, SIGNATURE_3, \mathrm{EAD}_3)$
+\State $M_3 \gets \mathbf{AEAD.Enc}(K_3, IV_3, PLAINTEXT_3)$
+\Comment{no $\mathrm{kem.ct}_R$ --- sent in $M_1$}
+\Statex \textit{[Section 3.2, 3.5]} \Comment{explicit $R$-auth via signature verification; new $\mathrm{kem.ct}_R$}
+\State Retrieve $\mathrm{kem.pk}_R, \mathrm{sign.pk}_R$; verify $\mathbf{DS.Verify}(\mathrm{sign.pk}_R, PLAINTEXT_2, SIGNATURE_2)$
+\State $(\mathrm{ss}_R, \mathrm{kem.ct}_R) \gets \mathbf{KEM.Encaps}(\mathrm{kem.pk}_R)$
+\State $PRK_{3e2m} \gets \mathbf{EDHOC\text{-}Extract}(SALT_{3e2m}, \mathrm{ss}_R)$
+\State $(K_3, IV_3) \gets \mathbf{EDHOC\text{-}KDF}(PRK_{3e2m}, 3\text{/}4, TH_3)$
+\State $MAC_3 \gets \mathbf{KDF}(PRK_{3e2m}, 6, (ID\_CRED_I, TH_3, \mathrm{EAD}_3))$
+\State $SIGNATURE_3 \gets \mathbf{DS.Sign}(\mathrm{sign.sk}_I, (ID\_CRED_I, TH_3, \mathrm{EAD}_3, MAC_3))$
+\State $CIPHERTEXT_3 \gets \mathbf{AEAD.Enc}(K_3, IV_3, (ID\_CRED_I, SIGNATURE_3, \mathrm{EAD}_3))$
+\State $M_3 \gets (\mathrm{kem.ct}_R, CIPHERTEXT_3)$
+\Statex \textit{[Section 3.3]} \Comment{sign $PLAINTEXT_3$ directly; no $MAC_3$; no $\mathrm{kem.ct}_R$}
+\State $MAC_2 \gets \mathbf{KDF}(PRK_{2e}, 2, \cdot)$; verify $\mathbf{DS.Verify}(\mathrm{sign.pk}_R, \cdot, SIGNATURE_2)$
+\State $(K_3, IV_3) \gets \mathbf{EDHOC\text{-}KDF}(PRK_{2e}, 3\text{/}4, TH_3)$
+\State $PLAINTEXT_3 \gets (ID\_CRED_I, TH_3, \mathrm{EAD}_3)$
+\State $SIGNATURE_3 \gets \mathbf{DS.Sign}(\mathrm{sign.sk}_I, PLAINTEXT_3)$
+\State $M_3 \gets \mathbf{AEAD.Enc}(K_3, IV_3, (PLAINTEXT_3 \parallel SIGNATURE_3))$
+\Statex \textit{[Section 3.4]} \Comment{no $SIG_2$ verify yet --- $R$-auth deferred to $M_4$; new $\mathrm{kem.ct}_R$}
+\State $(\mathrm{ss}_R, \mathrm{kem.ct}_R) \gets \mathbf{KEM.Encaps}(\mathrm{kem.pk}_R)$
+\State $PRK_{3e2m} \gets \mathbf{EDHOC\text{-}Extract}(SALT_{3e2m}, \mathrm{ss}_R)$
+\State $(K_3, IV_3) \gets \mathbf{EDHOC\text{-}KDF}(PRK_{3e2m}, 3\text{/}4, TH_3)$
+\State $SIGNATURE_3 \gets \mathbf{DS.Sign}(\mathrm{sign.sk}_I, (ID\_CRED_I, TH_3, \mathrm{EAD}_3))$
+\State $CIPHERTEXT_3 \gets \mathbf{AEAD.Enc}(K_3, IV_3, (ID\_CRED_I, TH_3, \mathrm{EAD}_3, SIGNATURE_3))$
+\State $M_3 \gets (\mathrm{kem.ct}_R, CIPHERTEXT_3)$
+\State \Return $M_3$
+\end{algorithmic}
+\end{algorithm}
+
+
+% ============================================
+% STEP 4: RESPONDER — Process M3, Prepare M4
+% ============================================
+\begin{algorithm}[H]
+\caption{Step 4 (Responder) --- Process $M_3$ and Prepare $M_4$}
+\label{alg:step4}
+\textbf{Input:} $M_3$ \\
+\textbf{Output:} $M_4$ (optional for Sec.~2,~3.2; mandatory for Sec.~3.3,~3.4,~3.5), $PRK_{\mathrm{out}}$
+\begin{algorithmic}[1]
+\Statex \textit{[All Sections]}
+\State Derive keys, decrypt $CIPHERTEXT_3$, and recover $PLAINTEXT_3$
+\State Verify $MAC_3$ and/or $SIGNATURE_3$ per section (details below)
+\Statex \textit{[Section 2, 3.2]} \Comment{$M_4$ optional; carries only $\mathrm{EAD}_4$}
+\State Verify $\mathbf{DS.Verify}(\mathrm{sign.pk}_I, (ID\_CRED_I, TH_3, \mathrm{EAD}_3, MAC_3), SIGNATURE_3)$
+\State $TH_4 \gets H(TH_3, PLAINTEXT_3, ID\_CRED_I)$
+\State $(K_4, IV_4) \gets \mathbf{EDHOC\text{-}KDF}(PRK_{3e2m}, 8\text{/}9, TH_4)$
+\State $M_4 \gets \mathbf{AEAD.Enc}(K_4, IV_4, \mathrm{EAD}_4)$ \quad\textit{(if requested)}
+\State $PRK_{\mathrm{out}} \gets \mathbf{KDF}(PRK_{3e2m}, 7, TH_4)$
+\Statex \textit{[Section 3.3]} \Comment{$M_4$ \emph{mandatory}; carries $\mathrm{kem.ct}_I$; $SALT_{4e3m}$ from $PRK_{2e}$}
+\State Verify $\mathbf{DS.Verify}(\mathrm{sign.pk}_I, PLAINTEXT_3, SIGNATURE_3)$
+\State $(\mathrm{ss}_I, \mathrm{kem.ct}_I) \gets \mathbf{KEM.Encaps}(\mathrm{kem.pk}_I)$
+\State $TH_4 \gets H(TH_3, PLAINTEXT_3, ID\_CRED_I)$
+\State $SALT_{4e3m} \gets \mathbf{KDF}(PRK_{2e}, 5, TH_4)$
+\State $PRK_{4e3m} \gets \mathbf{EDHOC\text{-}Extract}(SALT_{4e3m}, \mathrm{ss}_I)$
+\State $(K_4, IV_4) \gets \mathbf{EDHOC\text{-}KDF}(PRK_{4e3m}, 8\text{/}9, TH_4)$
+\State $M_4 \gets (\mathrm{kem.ct}_I, \mathbf{AEAD.Enc}(K_4, IV_4, \mathrm{EAD}_4))$
+\State $PRK_{\mathrm{out}} \gets \mathbf{KDF}(PRK_{4e3m}, 7, TH_4)$
+\Statex \textit{[Section 3.4]} \Comment{$M_4$ mandatory; carries \emph{deferred} $MAC_2$}
+\State $\mathrm{ss}_R \gets \mathbf{KEM.Decaps}(\mathrm{kem.sk}_R, \mathrm{kem.ct}_R)$
+\State Verify $\mathbf{DS.Verify}(\mathrm{sign.pk}_I, (ID\_CRED_I, TH_3, \mathrm{EAD}_3), SIGNATURE_3)$
+\State $(\mathrm{ss}_I, \mathrm{kem.ct}_I) \gets \mathbf{KEM.Encaps}(\mathrm{kem.pk}_I)$
+\State $TH_4 \gets H(TH_3, PLAINTEXT_3, ID\_CRED_I)$
+\State $SALT_{4e3m} \gets \mathbf{KDF}(PRK_{3e2m}, 5, TH_4)$
+\State $PRK_{4e3m} \gets \mathbf{EDHOC\text{-}Extract}(SALT_{4e3m}, \mathrm{ss}_I)$
+\State $(K_4, IV_4) \gets \mathbf{EDHOC\text{-}KDF}(PRK_{4e3m}, 8\text{/}9, TH_4)$
+\State $MAC_2 \gets \mathbf{KDF}(PRK_{4e3m}, 2, (C_R, ID\_CRED_R, TH_4, \mathrm{EAD}_4))$
+\State $M_4 \gets (\mathrm{kem.ct}_I, \mathbf{AEAD.Enc}(K_4, IV_4, (\mathrm{EAD}_4, MAC_2)))$
+\State $PRK_{\mathrm{out}} \gets \mathbf{KDF}(PRK_{4e3m}, 7, TH_4)$
+\Statex \textit{[Section 3.5]} \Comment{$M_4$ mandatory; carries only $\mathrm{EAD}_4$; $SIG_3$ over $PLAINTEXT_3$}
+\State $\mathrm{ss}_R \gets \mathbf{KEM.Decaps}(\mathrm{kem.sk}_R, \mathrm{kem.ct}_R)$
+\State Verify $\mathbf{DS.Verify}(\mathrm{sign.pk}_I, PLAINTEXT_3, SIGNATURE_3)$
+\State $(\mathrm{ss}_I, \mathrm{kem.ct}_I) \gets \mathbf{KEM.Encaps}(\mathrm{kem.pk}_I)$
+\State $TH_4 \gets H(TH_3, PLAINTEXT_3, ID\_CRED_I)$
+\State $SALT_{4e3m} \gets \mathbf{KDF}(PRK_{3e2m}, 5, TH_4)$
+\State $PRK_{4e3m} \gets \mathbf{EDHOC\text{-}Extract}(SALT_{4e3m}, \mathrm{ss}_I)$
+\State $(K_4, IV_4) \gets \mathbf{EDHOC\text{-}KDF}(PRK_{4e3m}, 8\text{/}9, TH_4)$
+\State $M_4 \gets (\mathrm{kem.ct}_I, \mathbf{AEAD.Enc}(K_4, IV_4, \mathrm{EAD}_4))$
+\State $PRK_{\mathrm{out}} \gets \mathbf{KDF}(PRK_{4e3m}, 7, TH_4)$
+\State \Return $M_4$, $PRK_{\mathrm{out}}$
+\end{algorithmic}
+\end{algorithm}
+
+
+% ============================================
+% STEP 5: INITIATOR — Process M4
+% ============================================
+\begin{algorithm}[H]
+\caption{Step 5 (Initiator) --- Process $M_4$ (optional for Sec.~2,~3.2; mandatory otherwise)}
+\label{alg:step5}
+\textbf{Input:} $M_4$ \\
+\textbf{Output:} $PRK_{\mathrm{out}}$
+\begin{algorithmic}[1]
+\Statex \textit{[Section 2, 3.2]} \Comment{decrypt $\mathrm{EAD}_4$ only}
+\State $(K_4, IV_4) \gets \mathbf{EDHOC\text{-}KDF}(PRK_{3e2m}, 8\text{/}9, TH_4)$
+\State $\mathrm{EAD}_4 \gets \mathbf{AEAD.Dec}(K_4, IV_4, CIPHERTEXT_4)$
+\State $PRK_{\mathrm{out}} \gets \mathbf{KDF}(PRK_{3e2m}, 7, TH_4)$
+\Statex \textit{[Section 3.3, 3.5]} \Comment{decaps $\mathrm{kem.ct}_I$; $SALT_{4e3m}$ source differs per section}
+\State $\mathrm{ss}_I \gets \mathbf{KEM.Decaps}(\mathrm{kem.sk}_I, \mathrm{kem.ct}_I)$
+\State $SALT_{4e3m} \gets \mathbf{KDF}(PRK_{2e\text{ or }3e2m}, 5, TH_4)$ \Comment{$PRK_{2e}$ for Sec.~3.3; $PRK_{3e2m}$ for Sec.~3.5}
+\State $PRK_{4e3m} \gets \mathbf{EDHOC\text{-}Extract}(SALT_{4e3m}, \mathrm{ss}_I)$
+\State $(K_4, IV_4) \gets \mathbf{EDHOC\text{-}KDF}(PRK_{4e3m}, 8\text{/}9, TH_4)$
+\State $\mathrm{EAD}_4 \gets \mathbf{AEAD.Dec}(K_4, IV_4, CIPHERTEXT_4)$
+\State $PRK_{\mathrm{out}} \gets \mathbf{KDF}(PRK_{4e3m}, 7, TH_4)$
+\Statex \textit{[Section 3.4]} \Comment{verify \emph{deferred} $MAC_2$ here $\Rightarrow$ explicit R-auth}
+\State $\mathrm{ss}_I \gets \mathbf{KEM.Decaps}(\mathrm{kem.sk}_I, \mathrm{kem.ct}_I)$
+\State $SALT_{4e3m} \gets \mathbf{KDF}(PRK_{3e2m}, 5, TH_4)$
+\State $PRK_{4e3m} \gets \mathbf{EDHOC\text{-}Extract}(SALT_{4e3m}, \mathrm{ss}_I)$
+\State $(K_4, IV_4) \gets \mathbf{EDHOC\text{-}KDF}(PRK_{4e3m}, 8\text{/}9, TH_4)$
+\State $(\mathrm{EAD}_4, MAC_2) \gets \mathbf{AEAD.Dec}(K_4, IV_4, CIPHERTEXT_4)$
+\State Verify $MAC_2 \stackrel{?}{=} \mathbf{KDF}(PRK_{4e3m}, 2, (C_R, ID\_CRED_R, TH_4, \mathrm{EAD}_4))$
+\State $PRK_{\mathrm{out}} \gets \mathbf{KDF}(PRK_{4e3m}, 7, TH_4)$
+\State \Return $PRK_{\mathrm{out}}$
+\end{algorithmic}
+\end{algorithm}
+
+
+% ============================================
+% STEP 6: KEY DERIVATION (Both parties)
+% ============================================
+\begin{algorithm}[H]
+\caption{Step 6 --- Final Key Derivation (Both Parties)}
+\label{alg:step6}
+\textbf{Input:} $PRK_{\mathrm{out}}$ \\
+\textbf{Output:} $MSK$, $EMSK$
+\begin{algorithmic}[1]
+\Statex \textit{[All Sections]}
+\State $MSK \gets \mathbf{EDHOC\text{-}Exporter}(PRK_{\mathrm{out}}, \text{``MSK''}, 64)$
+\State $EMSK \gets \mathbf{EDHOC\text{-}Exporter}(PRK_{\mathrm{out}}, \text{``EMSK''}, 64)$
+\State \Return $(MSK, EMSK)$
+\end{algorithmic}
+\end{algorithm}
+
+pastikan code proverif sinkron dengan algorithm dan code implementasi kita, file di simpan dalam direktori /proverif/* dengan nama section2.pv, section32.pv, section33.pv, section34.pv, section35.pv kemudian query yang diuji adalah : 
+
+\begin{table*}[t]
+\caption{Security Requirements Verification Queries}
+\label{tab:proverif_grouped}
+\centering
+\renewcommand{\arraystretch}{1.2}
+\footnotesize
+\begin{tabularx}{\linewidth}{%
+  >{\raggedright\arraybackslash}p{0.18\linewidth}
+  >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Security Requirement} & \textbf{Verification Query} \\
+\midrule
+
+Availability &
+\makecell[l]{%
+\textbf{Q1:} \texttt{inj-event(E\_STEP1\_I\_to\_R(msg1)) ==> inj-event(S\_STEP1\_I\_to\_R(msg1))} \\
+\textbf{Q2:} \texttt{inj-event(E\_STEP2\_R\_to\_I(mac2,msg2,TH2)) ==> inj-event(S\_STEP2\_R\_to\_I(mac2,msg2,TH2))} \\
+\textbf{Q3:} \texttt{inj-event(E\_STEP3\_I\_to\_R(mac3,msg3,TH3)) ==> inj-event(S\_STEP3\_I\_to\_R(mac3,msg3,TH3))}} \\
+\cmidrule(lr){1-2}
+
+Mutual Authentication &
+\makecell[l]{%
+% \textbf{Q1:} \texttt{inj-event(E\_STEP1\_I\_to\_R(msg1)) ==> inj-event(S\_STEP1\_I\_to\_R(msg1))} \\
+\textbf{Q2:} \texttt{inj-event(E\_STEP2\_R\_to\_I(mac2,msg2,TH2)) ==> inj-event(S\_STEP2\_R\_to\_I(mac2,msg2,TH2))} \\
+\textbf{\&\&} \\
+\textbf{Q3:} \texttt{inj-event(E\_STEP3\_I\_to\_R(mac3,msg3,TH3)) ==> inj-event(S\_STEP3\_I\_to\_R(mac3,msg3,TH3))}} \\
+\cmidrule(lr){1-2}
+
+Identity Concealment &
+\makecell[l]{%
+\textbf{Q4:} \texttt{query attacker(I)} \\
+\textbf{Q5:} \texttt{query attacker(R)}} \\
+\cmidrule(lr){1-2}
+
+Confidentiality &
+\makecell[l]{%
+\textbf{Q6:} \texttt{query attacker(app\_data1[])} \\
+\textbf{Q7:} \texttt{query attacker(app\_data2[])}} \\
+\cmidrule(lr){1-2}
+
+Secure Key Exchange &
+\makecell[l]{%
+\textbf{Q2:} \texttt{inj-event(E\_STEP2\_R\_to\_I(mac2,msg2,TH2)) ==> inj-event(S\_STEP2\_R\_to\_I(mac2,msg2,TH2))} \\
+\textbf{\&\&} \\
+\textbf{Q3:} \texttt{inj-event(E\_STEP3\_I\_to\_R(mac3,msg3,TH3)) ==> inj-event(S\_STEP3\_I\_to\_R(mac3,msg3,TH3))} \\
+\textbf{\&\&} \\
+\textbf{Q6:} \texttt{attacker(app\_data1[])} \\
+\textbf{\&\&} \\
+\textbf{Q7:} \texttt{attacker(app\_data2[])}} \\
+\cmidrule(lr){1-2}
+
+FS &
+\textbf{Q8:} \texttt{(phase 1; out(c,a)) \&\& (phase 1; out(c,b)) \&\& (query attacker(app\_data1[]) \&\& (query attacker(app\_data2[]))} \\
+\cmidrule(lr){1-2}
+
+Protection of external data \\ (AEAD Key/IV reuse) &
+\textbf{Q9:} \texttt{(
+Out(c,EK2)
+\&\&
+Out(c,EK3)
+\&\&
+query attacker(app\_data1[]) \&\& (query attacker(app\_data2[]
+)} \\
+\cmidrule(lr){1-2}
+
+Quantum Resilience &
+\textbf{Q10:} \texttt{(Inisiator out(c,x)) \&\& (Responder out(c,y)) \&\& (query attacker(app\_data1[]) \&\& (query attacker(app\_data2[]))} \\
+\bottomrule
+\end{tabularx}
+\end{table*}
