@@ -10,3 +10,6 @@ build/
 *.swo
 *~
 .vscode/
+
+# Runtime FreeRADIUS AAA overlay data
+output/freeradius_aaa/

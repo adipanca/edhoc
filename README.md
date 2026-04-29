@@ -76,7 +76,18 @@ Komponen yang digunakan:
 
 ## Build
 
-Build benchmark P2P:
+### Build Semua (P2P + EAP + Unified)
+
+```bash
+make clean && make -j$(nproc)
+```
+
+Menghasilkan 6 binary:
+- `build/p2p_initiator` / `build/p2p_responder` — P2P saja
+- `build/eap_initiator` / `build/eap_responder` — EAP saja
+- `build/initiator` / `build/responder` — Unified (P2P + EAP dalam 1 run)
+
+### Build P2P Saja
 
 ```bash
 make -f Makefile.p2p_bench
@@ -138,7 +149,7 @@ Hasil validasi terakhir (ringkas):
 - Semua 5 varian berhasil dijalankan end-to-end (initiator & responder)
 - CSV berhasil ditulis lengkap (8 file)
 
-## Output CSV
+## Output CSV (P2P)
 
 Berikut 8 file output yang dihasilkan:
 
@@ -166,10 +177,13 @@ edhoc/
 ├── Makefile
 ├── Makefile.crypto_bench
 ├── Makefile.p2p_bench
+├── Makefile.eap_bench          ← EAP-EDHOC benchmark build
+├── Makefile.unified_bench      ← Unified (P2P+EAP) benchmark build
 ├── README.md
 ├── note.txt
 ├── include/
 │   ├── edhoc_benchmark_p2p.h
+│   ├── edhoc_benchmark_eap.h   ← EAP-EDHOC constants & function declarations
 │   ├── edhoc_pq_kem.h
 │   ├── edhoc_common.h
 │   ├── edhoc_type0_classic.h
@@ -182,6 +196,14 @@ edhoc/
 │   ├── benchmark_p2p_common.c
 │   ├── benchmark_p2p_initiator.c
 │   ├── benchmark_p2p_responder.c
+│   ├── benchmark_eap_initiator.c   ← EAP Peer benchmark main
+│   ├── benchmark_eap_responder.c   ← EAP Server benchmark main
+│   ├── eap_layer.c                 ← EAP framing, fragmentation, MSK/EMSK
+│   ├── eap_variant_type0_classic.c ← EAP-EDHOC Type 0 Classic
+│   ├── eap_variant_type0_pq.c      ← EAP-EDHOC Type 0 PQ
+│   ├── eap_variant_type3_classic.c ← EAP-EDHOC Type 3 Classic
+│   ├── eap_variant_type3_pq.c      ← EAP-EDHOC Type 3 PQ (4-msg)
+│   ├── eap_variant_type3_hybrid.c  ← EAP-EDHOC Type 3 Hybrid
 │   ├── edhoc_pq_kem.c
 │   ├── edhoc_common.c
 │   ├── variant_type0_classic.c
@@ -189,10 +211,15 @@ edhoc/
 │   ├── variant_type3_classic.c
 │   ├── variant_type3_pq.c
 │   ├── variant_type3_hybrid.c
+│   ├── benchmark_unified_initiator.c  ← Unified initiator (P2P+EAP)
+│   ├── benchmark_unified_responder.c  ← Unified responder (P2P+EAP)
 │   ├── pqclean_kem.c
 │   ├── pqclean_sig.c
 │   ├── crypto_libsodium.c
 │   └── main.c
+├── docs/
+│   ├── handshake_mermaid.md        ← P2P handshake diagrams
+│   └── handshake_mermaid_eap.md    ← EAP-EDHOC handshake diagrams
 ├── lib/
 │   ├── PQClean/
 │   ├── uoscore-uedhoc/
@@ -212,11 +239,8 @@ edhoc/
 
 ## Referensi Flow Handshake
 
-- Diagram Mermaid terbaru untuk semua varian ada di `docs/handshake_mermaid.md`
-- Section yang sudah diupdate sesuai implementasi terbaru:
-  - Type 0 Classic (3-message sig-sig, Ed25519 + X25519)
-  - Type 0 PQ (3-message sig-sig, ML-DSA-65 + ML-KEM-768)
-  - Type 3 PQ (4-message mac-mac, encrypted MSG1)
+- Diagram Mermaid untuk semua varian P2P ada di `docs/handshake_mermaid.md`
+- Diagram Mermaid untuk semua varian EAP-EDHOC ada di `docs/handshake_mermaid_eap.md`
 
 ## Perbandingan Autentikasi Varian
 
@@ -227,3 +251,325 @@ edhoc/
 | Type 3 Classic | mac-mac | X25519 static DH | — | — | 3 |
 | Type 3 PQ | mac-mac | ML-KEM-768 (×3) | — | — | 4 |
 | Type 3 Hybrid | mac-mac | X25519 + ML-KEM-768 | — | — | 3 |
+
+---
+
+## EAP-EDHOC Benchmark
+
+Branch `eapedhoc` menambahkan wrapping **EAP-EDHOC** di atas semua 5 varian sesuai
+[draft-ietf-emu-eap-edhoc]. Skenario ini mensimulasikan penggunaan EDHOC sebagai
+EAP method untuk autentikasi jaringan (802.1X / RADIUS).
+
+### Protokol EAP-EDHOC
+
+- **EAP Method Type:** `0xFE` (254, Experimental)
+- **Transport:** TCP dengan 2-byte length prefix per EAP packet
+- **EAP MTU:** 1000 bytes/fragment; fragmen dikelola otomatis dengan flag L/M/S
+- **Port default:** `9877`
+- **MSK/EMSK:** 64 byte masing-masing, diderivasi dari `PRK_out` setelah handshake sukses
+
+```
+MSK  = EDHOC-Expand(PRK_out, "EAP-EDHOC MSK",  13, 64)
+EMSK = EDHOC-Expand(PRK_out, "EAP-EDHOC EMSK", 14, 64)
+```
+
+### Build EAP-EDHOC
+
+```bash
+make -f Makefile.eap_bench
+```
+
+Target lain:
+
+```bash
+make -f Makefile.eap_bench initiator    # EAP Peer saja
+make -f Makefile.eap_bench responder    # EAP Server saja
+make -f Makefile.eap_bench aaa-responder # EAP Server + AAA (FreeRADIUS)
+make -f Makefile.eap_bench clean        # Bersihkan objek EAP
+```
+
+Output binary:
+- `build/eap_initiator`  — EAP Peer (Supplicant)
+- `build/eap_responder`  — EAP Server (Authenticator)
+- `build/eap_aaa_responder` — EAP Server + AAA adapter (FreeRADIUS backend)
+
+### Cara Pakai (EAP-EDHOC)
+
+Penting:
+- Menjalankan `./build/p2p_responder` dan `./build/p2p_initiator` hanya menjalankan benchmark P2P.
+- Proses EAP tidak ikut jalan otomatis; jalankan binary EAP terpisah (`eap_responder` dan `eap_initiator`).
+
+Jalankan EAP Server dulu:
+
+```bash
+./build/eap_responder [port]
+```
+
+Lalu jalankan EAP Peer:
+
+```bash
+./build/eap_initiator <server_ip> [port]
+```
+
+Contoh run lokal (satu mesin):
+
+```bash
+./build/eap_responder 9877 &
+sleep 1
+./build/eap_initiator 127.0.0.1 9877
+```
+
+### Troubleshooting EAP Run
+
+Jika muncul error seperti:
+
+```bash
+./build/eap_responder: No such file or directory
+```
+
+atau command exit code `127`, biasanya binary EAP belum dibuild.
+
+Solusi:
+
+```bash
+cd /home/ubuntu/edhoc
+make -f Makefile.eap_bench clean
+make -f Makefile.eap_bench -j$(nproc)
+```
+
+Verifikasi binary EAP sudah ada:
+
+```bash
+ls -1 build/eap_initiator build/eap_responder
+```
+
+Run ulang:
+
+```bash
+./build/eap_responder 19500
+./build/eap_initiator 127.0.0.1 19500
+```
+
+Catatan:
+- `make` di root membangun P2P + EAP + Unified sekaligus.
+- Untuk build terpisah: `make p2p`, `make eap`, atau `make unified`.
+- Untuk EAP saja: `make -f Makefile.eap_bench`.
+
+### Output CSV EAP-EDHOC
+
+Delapan file CSV ditulis otomatis ke direktori `output/`:
+
+| File | Isi |
+|---|---|
+| `benchmark_crypto_eap_initiator.csv` | Micro-benchmark kripto (EAP Peer) |
+| `benchmark_crypto_eap_responder.csv` | Micro-benchmark kripto (EAP Server) |
+| `benchmark_fullhandshake_operation_eap_initiator.csv` | Rata-rata per operasi per varian |
+| `benchmark_fullhandshake_operation_eap_responder.csv` | Rata-rata per operasi per varian |
+| `benchmark_fullhandshake_overhead_eap_initiator.csv` | Memory overhead per varian |
+| `benchmark_fullhandshake_overhead_eap_responder.csv` | Memory overhead per varian |
+| `benchmark_fullhandshake_processing_eap_initiator.csv` | processing/txrx/total (µs) |
+| `benchmark_fullhandshake_processing_eap_responder.csv` | processing/txrx/total (µs) |
+
+### Hasil Benchmark EAP-EDHOC (loopback, 100 iterasi)
+
+| Rank | Varian | Total (µs) | Processing (µs) | Tx/Rx (µs) |
+|------|--------|-----------|----------------|------------|
+| 1 | Type 0 Classic | 258.92 | 83.56 | 87.41 |
+| 2 | Type 3 Classic | 277.88 | 93.02 | 103.56 |
+| 3 | Type 3 Hybrid | 800.12 | 268.16 | 330.38 |
+| 4 | Type 3 PQ | 1369.88 | 510.19 | 707.03 |
+| 5 | Type 0 PQ | 4326.39 | 1937.36 | 1870.48 |
+
+Catatan: Type 0 Classic dan Type 3 Classic memiliki timing yang sangat dekat (~19 µs
+selisih). Pada loop loopback, Ed25519 libsodium yang sangat optimal dapat sedikit
+mengalahkan X25519+HMAC karena overhead per-round-trip mendominasi pada pesan kecil.
+
+### EAP Round Trips per Varian
+
+| Varian | EDHOC Msgs | Fragment ACKs | Extra Rounds | Total EAP RT |
+|--------|-----------|--------------|--------------|--------------|
+| Type 0 Classic | 3 | 0 | 0 | 3 |
+| Type 3 Classic | 3 | 0 | 0 | 3 |
+| Type 3 Hybrid | 3 | 2 | 0 | 5 |
+| Type 3 PQ | 4 | 4 | 1 (MSG4 ACK) | 10 |
+| Type 0 PQ | 3 | 11 | 0 | 14 |
+
+### Diagram Sequence EAP-EDHOC
+
+Lihat `docs/handshake_mermaid_eap.md` untuk diagram lengkap semua 5 varian
+termasuk detail fragmentasi EAP dan derivasi MSK/EMSK.
+
+---
+
+## EAP Benchmark via AAA (FreeRADIUS)
+
+Pada branch `eapedhocAAA`, mode ini menambahkan adapter AAA di sisi responder:
+
+- `build/eap_responder` tetap dipertahankan sebagai mode standalone (baseline).
+- `build/eap_aaa_responder` menjalankan handshake EAP-EDHOC yang sama, lalu
+  melakukan AAA check ke FreeRADIUS via `radclient` untuk setiap varian.
+- Tujuan mode ini adalah komparasi benchmark: standalone vs AAA backend.
+
+Catatan implementasi:
+- Modifikasi FreeRADIUS dilakukan sebagai **overlay config** dari repo utama,
+  bukan edit permanen di dalam submodule.
+- Karena itu, setup tetap reproducible walau diawali dari:
+
+```bash
+git clone --recurse-submodules <repo-url>
+git submodule update --init --recursive
+```
+
+### Siapkan FreeRADIUS untuk AAA Benchmark
+
+Jalankan helper berikut dari root project:
+
+```bash
+make aaa-prepare
+```
+
+Perintah ini akan:
+- menyalin `lib/freeradius-server/raddb` ke `output/freeradius_aaa/raddb`
+- menambahkan client local benchmark (`127.0.0.1`, secret `testing123`)
+- menambahkan user uji: `edhoc_Type0_classic`, `edhoc_Type0_PQ`,
+  `edhoc_Type3_Classic`, `edhoc_Type3_PQ`, `edhoc_Type3_Hybrid`
+
+Jalankan FreeRADIUS debug mode:
+
+```bash
+make aaa-freeradius
+```
+
+Opsional smoke test AAA:
+
+```bash
+./scripts/freeradius_aaa/smoke_test.sh
+```
+
+### Run Benchmark EAP + AAA
+
+Terminal 1 (AAA responder):
+
+```bash
+./build/eap_aaa_responder 22300
+```
+
+Terminal 2 (initiator):
+
+```bash
+./build/eap_initiator 127.0.0.1 22300
+```
+
+Environment variable yang didukung oleh `eap_aaa_responder`:
+- `EDHOC_AAA_SERVER` (default `127.0.0.1`)
+- `EDHOC_AAA_PORT` (default `1812`)
+- `EDHOC_AAA_SECRET` (default `testing123`)
+- `EDHOC_AAA_REQUIRE` (`1` agar benchmark fail jika AAA reject/error)
+
+### Output CSV Mode AAA
+
+Selain CSV EAP standar, mode AAA menulis file pembanding berikut:
+
+- `output/benchmark_crypto_eap_aaa_responder.csv`
+- `output/benchmark_fullhandshake_operation_eap_aaa_responder.csv`
+- `output/benchmark_fullhandshake_overhead_eap_aaa_responder.csv`
+- `output/benchmark_fullhandshake_processing_eap_aaa_responder.csv`
+- `output/benchmark_eap_transport_aaa_responder.csv`
+- `output/benchmark_aaa_auth_responder.csv`
+
+Dengan pemisahan nama file ini, perbandingan terhadap mode standalone
+(`*_eap_responder.csv`) bisa dilakukan tanpa saling menimpa.
+
+---
+
+## Unified Benchmark (P2P + EAP + AAA)
+
+Binary unified (`build/initiator` dan `build/responder`) menjalankan **semua benchmark
+(P2P + EAP)** dalam satu kali run melalui satu koneksi TCP, dan pada fase EAP
+sisi responder juga melakukan **AAA check ke FreeRADIUS**.
+
+### Alur Eksekusi Unified
+
+1. **Phase 1** — Benchmark pure crypto (lokal, 17 operasi)
+2. **Phase 2** — P2P full handshake (5 varian × 100 iterasi)
+3. **Phase 3** — EAP-EDHOC full handshake (5 varian × 100 iterasi)
+4. **Phase 3b** — AAA auth check per varian (responder → FreeRADIUS)
+5. **Phase 4** — Tulis semua CSV (+ AAA summary)
+
+Transisi P2P→EAP menggunakan sinyal `0xFE` (phase switch) melalui koneksi TCP yang
+sama. Setelah EAP selesai, sinyal `0xFF` dikirim untuk mengakhiri benchmark.
+
+### Build Unified
+
+```bash
+make unified
+# atau build semua sekaligus:
+make clean && make -j$(nproc)
+```
+
+Output binary:
+- `build/initiator`
+- `build/responder`
+
+### Cara Pakai (Unified)
+
+Jalankan responder dulu:
+
+```bash
+./build/responder [port]
+```
+
+Lalu jalankan initiator:
+
+```bash
+./build/initiator <server_ip> [port]
+```
+
+Contoh run lokal:
+
+```bash
+./build/responder 19500 &
+sleep 1
+./build/initiator 127.0.0.1 19500
+```
+
+### Output CSV Unified
+
+Satu kali run menghasilkan **18 file CSV utama** (9 per sisi), ditambah
+CSV AAA summary pada responder unified:
+
+| File | Isi |
+|---|---|
+| `benchmark_crypto_initiator.csv` | Micro-benchmark kripto |
+| `benchmark_crypto_eap_initiator.csv` | Micro-benchmark kripto (salinan EAP) |
+| `benchmark_fullhandshake_operation_p2p_initiator.csv` | Per-operasi P2P |
+| `benchmark_fullhandshake_overhead_p2p_initiator.csv` | Memory overhead P2P |
+| `benchmark_fullhandshake_processing_p2p_initiator.csv` | Processing/txrx P2P |
+| `benchmark_fullhandshake_operation_eap_initiator.csv` | Per-operasi EAP |
+| `benchmark_fullhandshake_overhead_eap_initiator.csv` | Memory overhead EAP |
+| `benchmark_fullhandshake_processing_eap_initiator.csv` | Processing/txrx EAP |
+| `benchmark_eap_transport_initiator.csv` | EAP transport stats |
+
+(Sama untuk `_responder` — total 18 file.)
+
+Tambahan unified responder:
+
+- `benchmark_aaa_auth_unified_responder.csv`
+
+Kolom utama:
+- `type, attempts, accepted, rejected, avg_auth_ms, aaa_required, mode`
+
+Environment variable untuk AAA di mode unified responder:
+- `EDHOC_AAA_ENABLE` (default `1`, set `0` untuk disable)
+- `EDHOC_AAA_SERVER` (default `127.0.0.1`)
+- `EDHOC_AAA_PORT` (default `1812`)
+- `EDHOC_AAA_SECRET` (default `testing123`)
+- `EDHOC_AAA_REQUIRE` (`1` agar run gagal jika AAA check gagal)
+
+### Ringkasan Mode Run
+
+| Mode | Responder | Initiator | CSV |
+|------|-----------|-----------|-----|
+| P2P saja | `./build/p2p_responder 19500` | `./build/p2p_initiator <ip> 19500` | 8 file |
+| EAP saja | `./build/eap_responder 9877` | `./build/eap_initiator <ip> 9877` | 10 file |
+| **Unified (ALL + AAA)** | `./build/responder 19500` | `./build/initiator <ip> 19500` | **18 file + AAA CSV** |

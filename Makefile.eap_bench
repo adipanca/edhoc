@@ -1,0 +1,219 @@
+# ============================================================================
+# Makefile for EAP-EDHOC Benchmark (Initiator/EAP Peer + Responder/EAP Server)
+#
+# Wraps all 5 EDHOC variants with EAP framing per draft-ietf-emu-eap-edhoc.
+#
+# IMPORTANT: PQClean compiled with -O0 (as specified in requirements)
+#
+# Usage:
+#   make -f Makefile.eap_bench                  # Build both
+#   make -f Makefile.eap_bench initiator        # Build initiator only
+#   make -f Makefile.eap_bench responder        # Build responder only
+#   make -f Makefile.eap_bench clean            # Clean
+#
+# Run:
+#   Server:  ./build/eap_responder [port]
+#   Client:  ./build/eap_initiator <server_ip> [port]
+# ============================================================================
+
+.DEFAULT_GOAL := all
+
+CC      = gcc
+
+PROJ_DIR    = $(CURDIR)
+SRC_DIR     = $(PROJ_DIR)/src
+INC_DIR     = $(PROJ_DIR)/include
+BUILD_DIR   = $(PROJ_DIR)/build
+OUTPUT_DIR  = $(PROJ_DIR)/output
+
+# PQClean paths
+PQCLEAN_DIR        = $(PROJ_DIR)/lib/PQClean
+PQCLEAN_KEM_DIR    = $(PQCLEAN_DIR)/crypto_kem/ml-kem-768/clean
+PQCLEAN_SIG_DIR    = $(PQCLEAN_DIR)/crypto_sign/ml-dsa-65/clean
+PQCLEAN_COMMON_DIR = $(PQCLEAN_DIR)/common
+
+# mbedTLS paths (from uoscore-uedhoc externals)
+MBEDTLS_DIR        = $(PROJ_DIR)/lib/uoscore-uedhoc/externals/mbedtls
+MBEDTLS_LIB_DIR    = $(MBEDTLS_DIR)/library
+MBEDTLS_INC_DIR    = $(MBEDTLS_DIR)/include
+
+# Targets
+TARGET_INITIATOR = $(BUILD_DIR)/eap_initiator
+TARGET_RESPONDER = $(BUILD_DIR)/eap_responder
+TARGET_AAA_RESPONDER = $(BUILD_DIR)/eap_aaa_responder
+
+# ── Source files ──
+COMMON_SRCS  = $(SRC_DIR)/benchmark_p2p_common.c
+COMMON_SRCS += $(SRC_DIR)/edhoc_pq_kem.c
+COMMON_SRCS += $(SRC_DIR)/eap_layer.c
+COMMON_SRCS += $(SRC_DIR)/eap_variant_type0_classic.c
+COMMON_SRCS += $(SRC_DIR)/eap_variant_type0_pq.c
+COMMON_SRCS += $(SRC_DIR)/eap_variant_type3_classic.c
+COMMON_SRCS += $(SRC_DIR)/eap_variant_type3_pq.c
+COMMON_SRCS += $(SRC_DIR)/eap_variant_type3_hybrid.c
+
+INITIATOR_SRC = $(SRC_DIR)/benchmark_eap_initiator.c
+RESPONDER_SRC = $(SRC_DIR)/benchmark_eap_responder.c
+AAA_RESPONDER_SRC = $(SRC_DIR)/benchmark_eap_responder_aaa.c
+
+# PQClean sources
+PQCLEAN_KEM_SRCS    = $(wildcard $(PQCLEAN_KEM_DIR)/*.c)
+PQCLEAN_SIG_SRCS    = $(wildcard $(PQCLEAN_SIG_DIR)/*.c)
+PQCLEAN_COMMON_SRCS = $(wildcard $(PQCLEAN_COMMON_DIR)/*.c)
+
+# mbedTLS sources
+MBEDTLS_SRCS = $(wildcard $(MBEDTLS_LIB_DIR)/*.c)
+
+# ── Object files (prefixed with eap_ to avoid conflicts with P2P objects) ──
+COMMON_OBJS    = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/eap_%.o,$(COMMON_SRCS))
+INITIATOR_OBJ  = $(BUILD_DIR)/eap_benchmark_eap_initiator.o
+RESPONDER_OBJ  = $(BUILD_DIR)/eap_benchmark_eap_responder.o
+AAA_RESPONDER_OBJ = $(BUILD_DIR)/eap_benchmark_eap_responder_aaa.o
+
+PQCLEAN_KEM_OBJS    = $(patsubst $(PQCLEAN_KEM_DIR)/%.c,$(BUILD_DIR)/eap_pqkem_%.o,$(PQCLEAN_KEM_SRCS))
+PQCLEAN_SIG_OBJS    = $(patsubst $(PQCLEAN_SIG_DIR)/%.c,$(BUILD_DIR)/eap_pqsig_%.o,$(PQCLEAN_SIG_SRCS))
+PQCLEAN_COMMON_OBJS = $(patsubst $(PQCLEAN_COMMON_DIR)/%.c,$(BUILD_DIR)/eap_pqcommon_%.o,$(PQCLEAN_COMMON_SRCS))
+MBEDTLS_OBJS        = $(patsubst $(MBEDTLS_LIB_DIR)/%.c,$(BUILD_DIR)/eap_mbedtls_%.o,$(MBEDTLS_SRCS))
+
+SHARED_OBJS = $(COMMON_OBJS) $(PQCLEAN_KEM_OBJS) $(PQCLEAN_SIG_OBJS) $(PQCLEAN_COMMON_OBJS) $(MBEDTLS_OBJS)
+
+# ── Compiler flags ──
+CFLAGS  = -std=c11 -g -O2
+CFLAGS += -DMBEDTLS -DUSE_PQCLEAN -DLIBSODIUM
+CFLAGS += -DUNIT_TEST -DZCBOR -DZCBOR_CANONICAL -DOSCORE_NVM_SUPPORT
+CFLAGS += -DEAD_SIZE=0 -DC_I_SIZE=1 -DC_R_SIZE=1
+CFLAGS += -DID_CRED_R_SIZE=296 -DID_CRED_I_SIZE=296
+CFLAGS += -DCRED_R_SIZE=293 -DCRED_I_SIZE=293
+CFLAGS += -DSUITES_I_SIZE=1
+CFLAGS += -Wno-unused-parameter -Wno-sign-conversion -Wno-conversion
+CFLAGS += -Wno-cast-qual -Wno-missing-field-initializers -Wno-pointer-arith
+
+# **** PQClean compiled with -O0 (requirement: agar lebih lambat) ****
+PQCLEAN_CFLAGS = $(subst -O2,-O0,$(CFLAGS))
+
+# uoscore-uedhoc paths
+LIB_DIR     = $(PROJ_DIR)/lib/uoscore-uedhoc
+EXT_DIR     = $(LIB_DIR)/externals
+
+# ── Include paths ──
+C_INCLUDES  = -I$(INC_DIR)
+C_INCLUDES += -I$(LIB_DIR)/inc
+C_INCLUDES += -I$(PQCLEAN_DIR)
+C_INCLUDES += -I$(PQCLEAN_COMMON_DIR)
+C_INCLUDES += -I$(PQCLEAN_KEM_DIR)
+C_INCLUDES += -I$(PQCLEAN_SIG_DIR)
+C_INCLUDES += -I$(MBEDTLS_INC_DIR)
+C_INCLUDES += -I$(MBEDTLS_INC_DIR)/mbedtls
+C_INCLUDES += -I$(MBEDTLS_INC_DIR)/psa
+C_INCLUDES += -I$(MBEDTLS_LIB_DIR)
+C_INCLUDES += -I$(EXT_DIR)/zcbor/include
+
+# ── Linker flags ──
+LDFLAGS = -lsodium -lm
+
+# ============================================================================
+# Targets
+# ============================================================================
+.PHONY: all initiator responder aaa-responder clean help
+
+all: initiator responder aaa-responder
+	@echo ''
+	@echo '  EAP-EDHOC Build complete:'
+	@echo '    EAP Responder (Server): $(TARGET_RESPONDER)'
+	@echo '    EAP Responder (AAA):    $(TARGET_AAA_RESPONDER)'
+	@echo '    EAP Initiator (Peer):   $(TARGET_INITIATOR)'
+	@echo ''
+	@echo '  Run responder first (EAP Server side):'
+	@echo '    $(TARGET_RESPONDER) [port]'
+	@echo ''
+	@echo '  Then run initiator (EAP Peer side):'
+	@echo '    $(TARGET_INITIATOR) <server_ip> [port]'
+	@echo ''
+
+initiator: $(TARGET_INITIATOR)
+responder: $(TARGET_RESPONDER)
+aaa-responder: $(TARGET_AAA_RESPONDER)
+
+$(TARGET_INITIATOR): $(INITIATOR_OBJ) $(SHARED_OBJS)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $^ $(LDFLAGS) -o $@
+	@echo '=== Linked: $@ ==='
+
+$(TARGET_RESPONDER): $(RESPONDER_OBJ) $(SHARED_OBJS)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $^ $(LDFLAGS) -o $@
+	@echo '=== Linked: $@ ==='
+
+$(TARGET_AAA_RESPONDER): $(AAA_RESPONDER_OBJ) $(SHARED_OBJS)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $^ $(LDFLAGS) -o $@
+	@echo '=== Linked: $@ ==='
+
+# ── Compile rules ──
+
+# EAP Initiator main
+$(BUILD_DIR)/eap_benchmark_eap_initiator.o: $(INITIATOR_SRC)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(C_INCLUDES) -c $< -o $@
+
+# EAP Responder main
+$(BUILD_DIR)/eap_benchmark_eap_responder.o: $(RESPONDER_SRC)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(C_INCLUDES) -c $< -o $@
+
+# EAP AAA Responder main
+$(BUILD_DIR)/eap_benchmark_eap_responder_aaa.o: $(AAA_RESPONDER_SRC)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(C_INCLUDES) -c $< -o $@
+
+# Common source files (eap_layer.c + eap_variant_*.c + shared)
+$(BUILD_DIR)/eap_%.o: $(SRC_DIR)/%.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(C_INCLUDES) -c $< -o $@
+
+# PQClean — ML-KEM-768 (compiled with -O0!)
+$(BUILD_DIR)/eap_pqkem_%.o: $(PQCLEAN_KEM_DIR)/%.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(PQCLEAN_CFLAGS) $(C_INCLUDES) -c $< -o $@
+
+# PQClean — ML-DSA-65 (compiled with -O0!)
+$(BUILD_DIR)/eap_pqsig_%.o: $(PQCLEAN_SIG_DIR)/%.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(PQCLEAN_CFLAGS) $(C_INCLUDES) -c $< -o $@
+
+# PQClean — common (compiled with -O0!)
+$(BUILD_DIR)/eap_pqcommon_%.o: $(PQCLEAN_COMMON_DIR)/%.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(PQCLEAN_CFLAGS) $(C_INCLUDES) -c $< -o $@
+
+# mbedTLS
+$(BUILD_DIR)/eap_mbedtls_%.o: $(MBEDTLS_LIB_DIR)/%.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(C_INCLUDES) -DMBEDTLS -c $< -o $@
+
+clean:
+	rm -f $(BUILD_DIR)/eap_*.o
+	rm -f $(TARGET_INITIATOR) $(TARGET_RESPONDER) $(TARGET_AAA_RESPONDER)
+	@echo 'EAP benchmark objects cleaned.'
+
+help:
+	@echo 'EAP-EDHOC Benchmark Targets:'
+	@echo '  all        - Build both EAP initiator and responder (default)'
+	@echo '  initiator  - Build EAP initiator (EAP Peer) only'
+	@echo '  responder  - Build EAP responder (EAP Server) only'
+	@echo '  aaa-responder - Build EAP responder with AAA auth checks'
+	@echo '  clean      - Remove EAP benchmark objects and binaries'
+	@echo ''
+	@echo 'NOTE: PQClean is compiled with -O0 (requirement)'
+	@echo ''
+	@echo 'Run order (EAP-EDHOC benchmark):'
+	@echo '  1. Start EAP Server:  ./build/eap_responder [port]'
+	@echo '  2. Start EAP Peer:    ./build/eap_initiator <ip> [port]'
+	@echo ''
+	@echo 'Run order (EAP + AAA benchmark):'
+	@echo '  1. Start FreeRADIUS (see scripts/freeradius_aaa/)'
+	@echo '  2. Start AAA responder: ./build/eap_aaa_responder [port]'
+	@echo '  3. Start EAP Peer:      ./build/eap_initiator <ip> [port]'
+	@echo ''
+	@echo 'EAP-EDHOC variant ranking (fastest → slowest expected):'
+	@echo '  Type3_Classic < Type3_Hybrid < Type0_Classic < Type3_PQ < Type0_PQ'
