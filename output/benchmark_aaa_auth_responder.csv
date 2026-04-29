@@ -1,6 +1,6 @@
 type,attempts,accepted,rejected,avg_auth_ms,aaa_required
-Type0_classic,1,1,0,1055.918,1
-Type0_PQ,1,1,0,1029.962,1
-Type3_Classic,1,1,0,1063.533,1
-Type3_PQ,1,1,0,1049.550,1
-Type3_Hybrid,1,1,0,1094.374,1
+Type0_classic,1,1,0,42.526,1
+Type0_PQ,1,1,0,20.791,1
+Type3_Classic,1,1,0,9.578,1
+Type3_PQ,1,1,0,9.016,1
+Type3_Hybrid,1,1,0,10.221,1

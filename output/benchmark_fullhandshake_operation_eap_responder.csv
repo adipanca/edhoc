@@ -1,47 +1,47 @@
 type,role,operation,avg_time_us,calls_per_handshake,total_per_handshake_us,iterations
-Type0_classic,Responder,KeyGen,13.55,1,13.55,100
-Type0_classic,Responder,Scalar multiplication,29.60,1,29.60,100
-Type0_classic,Responder,HKDF-EXTRACT,0.80,1,0.80,100
-Type0_classic,Responder,HKDF-EXPANDS,6.77,5,33.84,100
-Type0_classic,Responder,HASH,2.06,3,6.19,100
+Type0_classic,Responder,KeyGen,13.52,1,13.52,100
+Type0_classic,Responder,Scalar multiplication,31.84,1,31.84,100
+Type0_classic,Responder,HKDF-EXTRACT,0.92,1,0.92,100
+Type0_classic,Responder,HKDF-EXPANDS,8.23,5,41.14,100
+Type0_classic,Responder,HASH,2.51,3,7.53,100
 Type0_classic,Responder,AEAD_ENCRYPT,0.00,0,0.00,100
-Type0_classic,Responder,AEAD_DECRYPT,0.56,1,0.56,100
-Type0_classic,Responder,Signature,13.44,1,13.44,100
-Type0_classic,Responder,Verify,36.00,1,36.00,100
+Type0_classic,Responder,AEAD_DECRYPT,0.95,1,0.95,100
+Type0_classic,Responder,Signature,15.07,1,15.07,100
+Type0_classic,Responder,Verify,41.83,1,41.83,100
 
 Type0_PQ,Responder,KeyGen,0.00,0,0.00,100
-Type0_PQ,Responder,Encaps,153.52,1,153.52,100
+Type0_PQ,Responder,Encaps,152.76,1,152.76,100
 Type0_PQ,Responder,Decaps,0.00,0,0.00,100
-Type0_PQ,Responder,HKDF-EXTRACT,1.36,1,1.36,100
-Type0_PQ,Responder,HKDF-EXPANDS,132.14,5,660.71,100
-Type0_PQ,Responder,HASH,34.32,3,102.96,100
+Type0_PQ,Responder,HKDF-EXTRACT,1.35,1,1.35,100
+Type0_PQ,Responder,HKDF-EXPANDS,128.17,5,640.84,100
+Type0_PQ,Responder,HASH,35.21,3,105.62,100
 Type0_PQ,Responder,AEAD_ENCRYPT,0.00,0,0.00,100
-Type0_PQ,Responder,AEAD_DECRYPT,2.69,1,2.69,100
-Type0_PQ,Responder,Signature,1423.77,1,1423.77,100
-Type0_PQ,Responder,Verify,397.64,1,397.64,100
+Type0_PQ,Responder,AEAD_DECRYPT,2.72,1,2.72,100
+Type0_PQ,Responder,Signature,1439.09,1,1439.09,100
+Type0_PQ,Responder,Verify,392.23,1,392.23,100
 
-Type3_Classic,Responder,KeyGen,12.88,1,12.88,100
-Type3_Classic,Responder,Scalar multiplication,86.50,3,259.49,100
-Type3_Classic,Responder,HKDF-EXTRACT,2.28,3,6.83,100
-Type3_Classic,Responder,HKDF-EXPANDS,7.49,7,52.46,100
-Type3_Classic,Responder,HASH,1.77,3,5.32,100
+Type3_Classic,Responder,KeyGen,13.13,1,13.13,100
+Type3_Classic,Responder,Scalar multiplication,125.85,3,377.56,100
+Type3_Classic,Responder,HKDF-EXTRACT,2.34,3,7.01,100
+Type3_Classic,Responder,HKDF-EXPANDS,7.34,7,51.35,100
+Type3_Classic,Responder,HASH,1.75,3,5.24,100
 Type3_Classic,Responder,AEAD_ENCRYPT,0.00,0,0.00,100
-Type3_Classic,Responder,AEAD_DECRYPT,0.62,1,0.62,100
+Type3_Classic,Responder,AEAD_DECRYPT,0.64,1,0.64,100
 
 Type3_PQ,Responder,KeyGen,0.00,0,0.00,100
-Type3_PQ,Responder,Encaps,277.73,2,555.46,100
-Type3_PQ,Responder,Decaps,169.64,1,169.64,100
-Type3_PQ,Responder,HKDF-EXTRACT,3.41,3,10.22,100
-Type3_PQ,Responder,HKDF-EXPANDS,10.75,7,75.26,100
-Type3_PQ,Responder,HASH,21.63,4,86.51,100
-Type3_PQ,Responder,AEAD_ENCRYPT,0.89,2,1.78,100
-Type3_PQ,Responder,AEAD_DECRYPT,1.21,2,2.43,100
+Type3_PQ,Responder,Encaps,279.69,2,559.37,100
+Type3_PQ,Responder,Decaps,170.09,1,170.09,100
+Type3_PQ,Responder,HKDF-EXTRACT,3.32,3,9.97,100
+Type3_PQ,Responder,HKDF-EXPANDS,10.79,7,75.51,100
+Type3_PQ,Responder,HASH,22.10,4,88.38,100
+Type3_PQ,Responder,AEAD_ENCRYPT,0.82,2,1.64,100
+Type3_PQ,Responder,AEAD_DECRYPT,1.29,2,2.58,100
 
-Type3_Hybrid,Responder,KeyGen,13.88,1,13.88,100
-Type3_Hybrid,Responder,Encaps,270.88,4,1083.51,100
+Type3_Hybrid,Responder,KeyGen,11.69,1,11.69,100
+Type3_Hybrid,Responder,Encaps,225.31,4,901.24,100
 Type3_Hybrid,Responder,Decaps,0.00,0,0.00,100
-Type3_Hybrid,Responder,HKDF-EXTRACT,2.95,3,8.86,100
-Type3_Hybrid,Responder,HKDF-EXPANDS,13.31,8,106.51,100
-Type3_Hybrid,Responder,HASH,10.83,3,32.48,100
-Type3_Hybrid,Responder,AEAD_ENCRYPT,0.73,1,0.73,100
-Type3_Hybrid,Responder,AEAD_DECRYPT,0.73,1,0.73,100
+Type3_Hybrid,Responder,HKDF-EXTRACT,2.34,3,7.02,100
+Type3_Hybrid,Responder,HKDF-EXPANDS,11.57,8,92.57,100
+Type3_Hybrid,Responder,HASH,9.20,3,27.60,100
+Type3_Hybrid,Responder,AEAD_ENCRYPT,0.61,1,0.61,100
+Type3_Hybrid,Responder,AEAD_DECRYPT,0.83,1,0.83,100

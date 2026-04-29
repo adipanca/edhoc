@@ -27,10 +27,11 @@ if [[ -x "$FR_DIR/build/bin/local/radiusd" ]]; then
   RAD_BIN="$FR_DIR/build/bin/local/radiusd"
 elif command -v radiusd >/dev/null 2>&1; then
   RAD_BIN="$(command -v radiusd)"
+elif [[ -x /usr/sbin/freeradius ]]; then
+  RAD_BIN="/usr/sbin/freeradius"
 else
-  echo "ERROR: radiusd binary not found. Build FreeRADIUS first:"
-  echo "  cd $FR_DIR"
-  echo "  ./configure && make -j\$(nproc)"
+  echo "ERROR: radiusd binary not found. Build FreeRADIUS first or install package:"
+  echo "  sudo apt install freeradius freeradius-utils"
   exit 1
 fi
 

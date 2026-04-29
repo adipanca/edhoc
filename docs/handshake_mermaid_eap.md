@@ -262,3 +262,71 @@ EMSK (64B) = EDHOC-Expand(PRK_out, "EAP-EDHOC EMSK", 14, 64)
 ```
 
 where `EDHOC-Expand` is `HKDF-Expand(PRK_out, context_string || length, outlen)`.
+
+---
+
+## Secondary Authentication via FreeRADIUS AAA
+
+The diagram below shows the **complete secondary-authentication flow** as
+implemented in [src/benchmark_eap_responder_aaa.c](../src/benchmark_eap_responder_aaa.c)
+and [src/benchmark_eap_initiator.c](../src/benchmark_eap_initiator.c). The IoT
+device (EAP Peer / Initiator) performs an EAP-EDHOC handshake with the EAP
+Authenticator (Responder), which then validates the device's identity against a
+back-end FreeRADIUS server using the standard RADIUS Access-Request/Accept
+exchange before granting network access.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant DEV as IoT Device<br/>(EAP Peer / Initiator)
+    participant AUTH as EAP Authenticator<br/>(eap_aaa_responder)
+    participant AAA as AAA Server<br/>(FreeRADIUS)
+
+    Note over DEV,AUTH: 1) EAP-EDHOC primary key establishment (one of 5 variants)
+    AUTH->>DEV: EAP-Request / EAP-EDHOC Start (Type=0xFE, S-flag)
+    DEV->>AUTH: EAP-Response / EDHOC MSG1 (fragmented if > MTU)
+    AUTH->>DEV: EAP-Request / EDHOC MSG2 (fragmented if > MTU)
+    DEV->>AUTH: EAP-Response / EDHOC MSG3
+    opt Type 3 PQ (4-message variant)
+        AUTH->>DEV: EAP-Request / EDHOC MSG4
+        DEV->>AUTH: EAP-Response / ACK
+    end
+    Note over DEV,AUTH: PRK_out established → MSK / EMSK derived
+
+    Note over AUTH,AAA: 2) Secondary authentication via RADIUS (post-EDHOC)
+    AUTH->>AAA: RADIUS Access-Request<br/>User-Name = "edhoc_<Variant>"<br/>User-Password = shared secret<br/>NAS-IP-Address, Message-Authenticator
+    AAA->>AAA: Lookup user in mods-config/files/authorize<br/>Verify Cleartext-Password
+    AAA-->>AUTH: RADIUS Access-Accept<br/>(or Access-Reject on failure)
+
+    alt AAA accepted
+        AUTH->>DEV: EAP-Success<br/>+ MSK (64 B) / EMSK (64 B)
+        Note over DEV,AUTH: Device authorized — keys ready for OSCORE / link-layer encryption
+    else AAA rejected
+        AUTH->>DEV: EAP-Failure
+        Note over DEV,AUTH: Session terminated, keys discarded
+    end
+```
+
+### Mapping ke Code
+
+| Komponen | File | Fungsi utama |
+|---|---|---|
+| EAP Peer (IoT device) | [src/benchmark_eap_initiator.c](../src/benchmark_eap_initiator.c) | `run_handshake_benchmarks()`, `eap_send_response()` |
+| EAP Authenticator | [src/benchmark_eap_responder_aaa.c](../src/benchmark_eap_responder_aaa.c) | `wait_for_client()`, `aaa_authenticate_variant()` |
+| EAP layer & fragmentation | [src/eap_layer.c](../src/eap_layer.c) | `eap_send()`, `eap_recv()`, `eap_derive_msk_emsk()` |
+| Per-variant EDHOC handshake | [src/eap_variant_type0_classic.c](../src/eap_variant_type0_classic.c) … `_type3_hybrid.c` | `run_eap_<variant>_initiator/_responder()` |
+| AAA prepare script | [scripts/freeradius_aaa/prepare.sh](../scripts/freeradius_aaa/prepare.sh) | Setup FreeRADIUS raddb dengan port 3812 + EDHOC users |
+| AAA run script | [scripts/freeradius_aaa/run_debug.sh](../scripts/freeradius_aaa/run_debug.sh) | Jalankan `freeradius -X` (debug mode) |
+| AAA smoke test | [scripts/freeradius_aaa/smoke_test.sh](../scripts/freeradius_aaa/smoke_test.sh) | `radclient` Access-Request manual |
+
+### Compliance dengan draft-ietf-emu-eap-edhoc
+
+| Aspek draft | Implementasi |
+|---|---|
+| EAP Method Type | `0xFE` (Experimental, sesuai §3.1 draft) |
+| EAP Header Flags | `L` (Length), `M` (More), `S` (Start) — `eap_layer.c` |
+| Fragmentation MTU | Default `EAP_EDHOC_MTU = 1000 B` (§3.2) |
+| EDHOC message flow | MSG1/MSG2/MSG3 (+MSG4 untuk method 3 PQ) |
+| MSK derivation | `MSK  = EDHOC-Expand(PRK_out, "EAP-EDHOC MSK", 13, 64)` (§4) |
+| EMSK derivation | `EMSK = EDHOC-Expand(PRK_out, "EAP-EDHOC EMSK", 14, 64)` (§4) |
+| AAA back-end | FreeRADIUS via `radclient` (RFC 2865 Access-Request/Accept) |

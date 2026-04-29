@@ -20,6 +20,64 @@ Status implementasi terbaru:
 - **Type 3 PQ**: 4-message mac-mac, 3 operasi ML-KEM-768 + MAC, Message 1 terenkripsi.
 - **Type 3 Hybrid**: 3-message mac-mac, X25519 ECDHE + ML-KEM-768 + HMAC-SHA256.
 - Diagram flow terbaru tersedia di `docs/handshake_mermaid.md`.
+- **Secondary authentication EAP-EDHOC + FreeRADIUS AAA** tersedia untuk semua 5 varian
+  ([draft-ietf-emu-eap-edhoc](https://datatracker.ietf.org/doc/draft-ietf-emu-eap-edhoc/)),
+  diagram dan mapping kode di [docs/handshake_mermaid_eap.md](docs/handshake_mermaid_eap.md).
+
+## Secondary Authentication (EAP-EDHOC + FreeRADIUS AAA)
+
+Selain mode P2P murni, repository ini menyediakan **secondary authentication
+untuk IoT** sesuai [draft-ietf-emu-eap-edhoc](https://datatracker.ietf.org/doc/draft-ietf-emu-eap-edhoc/):
+EDHOC dijalankan sebagai EAP method (Type `0xFE`) dan setelah handshake sukses
+sisi authenticator melakukan AAA check ke server **FreeRADIUS** sebelum
+mengirim `EAP-Success` + MSK/EMSK ke device.
+
+Semua 5 varian EDHOC didukung dalam mode EAP:
+1. Type 0 Classic — Ed25519 sig-sig, 3 EAP messages (1 fragment per msg)
+2. Type 0 PQ — ML-DSA-65 sig-sig, 3 EAP messages (fragmented, ~11 fragments)
+3. Type 3 Classic — X25519 mac-mac, 3 EAP messages (1 fragment per msg)
+4. Type 3 PQ — ML-KEM-768 (×3) mac-mac, 4 EAP messages (encrypted MSG1)
+5. Type 3 Hybrid — X25519 + ML-KEM-768 mac-mac, 3 EAP messages
+
+Komponen utama:
+
+| Komponen | File / target |
+|---|---|
+| EAP Peer (IoT device) | [src/benchmark_eap_initiator.c](src/benchmark_eap_initiator.c) → `build/eap_initiator` |
+| EAP Authenticator (loopback test) | [src/benchmark_eap_responder.c](src/benchmark_eap_responder.c) → `build/eap_responder` |
+| EAP Authenticator + AAA backend | [src/benchmark_eap_responder_aaa.c](src/benchmark_eap_responder_aaa.c) → `build/eap_aaa_responder` |
+| EAP framing & fragmentation (L/M/S) | [src/eap_layer.c](src/eap_layer.c) |
+| Per-variant EAP-EDHOC handshake | `src/eap_variant_type0_classic.c` … `src/eap_variant_type3_hybrid.c` |
+| FreeRADIUS overlay config | [scripts/freeradius_aaa/prepare.sh](scripts/freeradius_aaa/prepare.sh) |
+| FreeRADIUS run script (debug -X) | [scripts/freeradius_aaa/run_debug.sh](scripts/freeradius_aaa/run_debug.sh) |
+| AAA smoke test (radclient) | [scripts/freeradius_aaa/smoke_test.sh](scripts/freeradius_aaa/smoke_test.sh) |
+
+Quick-start (verified end-to-end):
+
+```bash
+# 1) Build EAP binaries
+make eap
+
+# 2) Setup FreeRADIUS overlay (uses system freeradius if submodule absent)
+bash scripts/freeradius_aaa/prepare.sh
+
+# 3) Start FreeRADIUS in debug mode (port 3812 untuk hindari konflik)
+nohup /usr/sbin/freeradius -X \
+  -d "$PWD/output/freeradius_aaa/raddb" \
+  -D "$PWD/output/freeradius_aaa/dictionary" \
+  -n radiusd > output/freeradius_aaa/freeradius_debug.log 2>&1 &
+
+# 4) Verify AAA reachable
+bash scripts/freeradius_aaa/smoke_test.sh 127.0.0.1 3812 testing123 \
+  edhoc_Type0_classic edhoc-pass
+
+# 5) Run EAP-EDHOC + AAA benchmark end-to-end (loopback)
+EDHOC_AAA_PORT=3812 EDHOC_AAA_REQUIRE=1 ./build/eap_aaa_responder 19600 &
+./build/eap_initiator 127.0.0.1 19600
+```
+
+Diagram lengkap (sequence per varian + alur AAA) ada di
+[docs/handshake_mermaid_eap.md](docs/handshake_mermaid_eap.md).
 
 ## Ringkasan Fitur
 
