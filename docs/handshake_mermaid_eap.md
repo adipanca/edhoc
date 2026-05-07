@@ -1,4 +1,13 @@
-# EAP-EDHOC Handshake Diagrams
+# EAP-EDHOC Handshake Diagrams (Primary Authentication)
+
+> **Scope:** dokumen ini menggambarkan **primary authentication** —
+> EAP-EDHOC dipakai untuk network access (link-layer) dengan FreeRADIUS sebagai
+> backend AAA operator. Output kunci: `MSK` / `EMSK`.
+>
+> Untuk **secondary authentication** (EAP-EDHOC ke service / DN-AAA setelah
+> device sudah ter-attach, dengan opsi *channel-binding* via EMSK primary,
+> dan output Application Key untuk OSCORE) lihat file terpisah:
+> [handshake_mermaid_eap_secondary_authentication.md](handshake_mermaid_eap_secondary_authentication.md).
 
 Sequence diagrams for all 5 EDHOC variants wrapped in **EAP-EDHOC** framing
 per [draft-ietf-emu-eap-edhoc].
