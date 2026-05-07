@@ -58,32 +58,56 @@ PRK_out_primary                    PRK_out_secondary
 ## 3. Sequence Diagram: As-Implemented Flow (Current Code)
 
 ```mermaid
+
 sequenceDiagram
     autonumber
     participant DEV as IoT Device
-    participant SRV as EAP Authenticator<br/>(eap_aaa_responder)
-    participant AAA as FreeRADIUS<br/>(radclient backend)
+    participant AP  as Access Point<br/>(EAP Authenticator #1)
+    participant AAA1 as Operator AAA<br/>(FreeRADIUS:3812)
+    participant SRV as Application Server<br/>(EAP Authenticator #2)
+    participant AAA2 as DN-AAA<br/>(FreeRADIUS:3812 / realm svc)
 
-    Note over DEV,SRV: Pre-session static key exchange dilakukan raw TCP<br/>sesuai varian (Ed25519 / X25519 / ML-KEM / hybrid)
-
-    DEV->>SRV: TCP connect (port 19600)
-    SRV->>DEV: EAP-Request/Start (Type=0xFE, Flags=S)
-    DEV->>SRV: EAP-Response/MSG1 (fragmented if len > MTU)
-    SRV->>DEV: EAP-Request/MSG2 (fragmented if len > MTU)
-    DEV->>SRV: EAP-Response/MSG3
-    opt Type3_PQ only
-        SRV->>DEV: EAP-Request/MSG4
-        DEV->>SRV: EAP-Response/ACK (empty payload)
+    rect rgb(235, 245, 255)
+    Note over DEV,AAA1: PHASE A — PRIMARY AUTH (network access)
+    AP->>DEV: EAP-Request / EAP-EDHOC Start
+    DEV->>AP: EAP-Response / EDHOC MSG1 (variant X)
+    AP->>DEV: EAP-Request / EDHOC MSG2
+    DEV->>AP: EAP-Response / EDHOC MSG3
+    AP->>AAA1: RADIUS Access-Request (User-Name = "edhoc_<Variant>@operator")
+    AAA1-->>AP: RADIUS Access-Accept
+    AP->>DEV: EAP-Success
+    Note over DEV,AP: Derive MSK_p, EMSK_p<br/>Link-layer encryption ON (Wi-Fi/5G)
     end
 
-    Note over DEV,SRV: EDHOC verification + key schedule dilakukan di DEV/SRV<br/>kemudian derive PRK_out -> MSK/EMSK
+    Note over DEV,SRV: Device sekarang punya konektivitas IP.<br/>Buka sesi ke service ⇒ trigger secondary auth.
+
+    rect rgb(245, 235, 255)
+    Note over DEV,AAA2: PHASE B — SECONDARY AUTH (service access via EAP-EDHOC)
+    DEV->>SRV: TCP/TLS connect (port 19600)
+    SRV->>DEV: EAP-Request / EAP-EDHOC Start (S-flag, Type=0xFE)
+    DEV->>SRV: EAP-Response / EDHOC MSG1<br/>SUITES_I, G_X, C_I,<br/>ext = H(EMSK_p)  ← channel binding
+    SRV->>DEV: EAP-Request / EDHOC MSG2<br/>(G_Y, C_R, CIPHERTEXT_2)
+    DEV->>SRV: EAP-Response / EDHOC MSG3<br/>(CIPHERTEXT_3)
+    opt Type 3 PQ (4-message)
+        SRV->>DEV: EAP-Request / EDHOC MSG4
+        DEV->>SRV: EAP-Response / ACK
+    end
+
+    SRV->>AAA2: RADIUS Access-Request<br/>User-Name = "edhoc_<Variant>@svc"<br/>State = H(EMSK_p)  (binding evidence)
+    opt Cross-AAA verification (if binding aktif)
+        AAA2->>AAA1: Verify EMSK_p binding for device
+        AAA1-->>AAA2: OK / NotFound
+    end
+    AAA2-->>SRV: RADIUS Access-Accept
     SRV->>DEV: EAP-Success
+    Note over DEV,SRV: Derive MSK_s, EMSK_s, Application Key<br/>App Key → OSCORE Master Secret
+    end
 
-    Note over SRV,AAA: Setelah handshake sukses, responder memanggil AAA via radclient
-    SRV->>AAA: Access-Request auth<br/>User-Name=edhoc_<variant><br/>User-Password=edhoc-pass<br/>NAS-IP-Address=127.0.0.1<br/>Service-Type=Framed-User
-    AAA-->>SRV: Access-Accept or Access-Reject
-
-    Note over SRV: Jika AAA reject dan EDHOC_AAA_REQUIRE=1,<br/>benchmark loop dihentikan (tanpa kirim EAP-Failure tambahan)
+    rect rgb(235, 255, 235)
+    Note over DEV,SRV: PHASE C — APPLICATION DATA (protected by OSCORE)
+    DEV->>SRV: CoAP/HTTP request (encrypted with App Key)
+    SRV->>DEV: CoAP/HTTP response (encrypted with App Key)
+    end
 ```
 
 ---
