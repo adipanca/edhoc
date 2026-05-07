@@ -55,65 +55,42 @@ PRK_out_primary                    PRK_out_secondary
 
 ---
 
-## 3. Sequence Diagram: Full Two-Phase Flow
+## 3. Sequence Diagram: As-Implemented Flow (Current Code)
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant DEV as IoT Device
-    participant AP  as Access Point<br/>(EAP Authenticator #1)
-    participant AAA1 as Operator AAA<br/>(FreeRADIUS:3812)
-    participant SRV as Application Server<br/>(EAP Authenticator #2)
-    participant AAA2 as DN-AAA<br/>(FreeRADIUS:3812 / realm svc)
+    participant SRV as EAP Authenticator<br/>(eap_aaa_responder)
+    participant AAA as FreeRADIUS<br/>(radclient backend)
 
-    rect rgb(235, 245, 255)
-    Note over DEV,AAA1: PHASE A — PRIMARY AUTH (network access)
-    AP->>DEV: EAP-Request / EAP-EDHOC Start
-    DEV->>AP: EAP-Response / EDHOC MSG1 (variant X)
-    AP->>DEV: EAP-Request / EDHOC MSG2
-    DEV->>AP: EAP-Response / EDHOC MSG3
-    AP->>AAA1: RADIUS Access-Request (User-Name = "edhoc_<Variant>@operator")
-    AAA1-->>AP: RADIUS Access-Accept
-    AP->>DEV: EAP-Success
-    Note over DEV,AP: Derive MSK_p, EMSK_p<br/>Link-layer encryption ON (Wi-Fi/5G)
+    Note over DEV,SRV: Pre-session static key exchange dilakukan raw TCP<br/>sesuai varian (Ed25519 / X25519 / ML-KEM / hybrid)
+
+    DEV->>SRV: TCP connect (port 19600)
+    SRV->>DEV: EAP-Request/Start (Type=0xFE, Flags=S)
+    DEV->>SRV: EAP-Response/MSG1 (fragmented if len > MTU)
+    SRV->>DEV: EAP-Request/MSG2 (fragmented if len > MTU)
+    DEV->>SRV: EAP-Response/MSG3
+    opt Type3_PQ only
+        SRV->>DEV: EAP-Request/MSG4
+        DEV->>SRV: EAP-Response/ACK (empty payload)
     end
 
-    Note over DEV,SRV: Device sekarang punya konektivitas IP.<br/>Buka sesi ke service ⇒ trigger secondary auth.
-
-    rect rgb(245, 235, 255)
-    Note over DEV,AAA2: PHASE B — SECONDARY AUTH (service access via EAP-EDHOC)
-    DEV->>SRV: TCP/TLS connect (port 19600)
-    SRV->>DEV: EAP-Request / EAP-EDHOC Start (S-flag, Type=0xFE)
-    DEV->>SRV: EAP-Response / EDHOC MSG1<br/>SUITES_I, G_X, C_I,<br/>ext = H(EMSK_p)  ← channel binding
-    SRV->>DEV: EAP-Request / EDHOC MSG2<br/>(G_Y, C_R, CIPHERTEXT_2)
-    DEV->>SRV: EAP-Response / EDHOC MSG3<br/>(CIPHERTEXT_3)
-    opt Type 3 PQ (4-message)
-        SRV->>DEV: EAP-Request / EDHOC MSG4
-        DEV->>SRV: EAP-Response / ACK
-    end
-
-    SRV->>AAA2: RADIUS Access-Request<br/>User-Name = "edhoc_<Variant>@svc"<br/>State = H(EMSK_p)  (binding evidence)
-    opt Cross-AAA verification (if binding aktif)
-        AAA2->>AAA1: Verify EMSK_p binding for device
-        AAA1-->>AAA2: OK / NotFound
-    end
-    AAA2-->>SRV: RADIUS Access-Accept
+    Note over DEV,SRV: EDHOC verification + key schedule dilakukan di DEV/SRV<br/>kemudian derive PRK_out -> MSK/EMSK
     SRV->>DEV: EAP-Success
-    Note over DEV,SRV: Derive MSK_s, EMSK_s, Application Key<br/>App Key → OSCORE Master Secret
-    end
 
-    rect rgb(235, 255, 235)
-    Note over DEV,SRV: PHASE C — APPLICATION DATA (protected by OSCORE)
-    DEV->>SRV: CoAP/HTTP request (encrypted with App Key)
-    SRV->>DEV: CoAP/HTTP response (encrypted with App Key)
-    end
+    Note over SRV,AAA: Setelah handshake sukses, responder memanggil AAA via radclient
+    SRV->>AAA: Access-Request auth<br/>User-Name=edhoc_<variant><br/>User-Password=edhoc-pass<br/>NAS-IP-Address=127.0.0.1<br/>Service-Type=Framed-User
+    AAA-->>SRV: Access-Accept or Access-Reject
+
+    Note over SRV: Jika AAA reject dan EDHOC_AAA_REQUIRE=1,<br/>benchmark loop dihentikan (tanpa kirim EAP-Failure tambahan)
 ```
 
 ---
 
-## 4. Sequence Diagram: Secondary Auth Saja (zoom-in)
+## 4. Sequence Diagram: Secondary Auth Saja (Zoom-in, As Implemented)
 
-Asumsi primary auth sudah sukses; device punya `EMSK_p` di memory.
+Diagram ini mengikuti urutan aktual di kode saat ini.
 
 ```mermaid
 sequenceDiagram
@@ -122,41 +99,112 @@ sequenceDiagram
     participant SRV as Application Server<br/>(EAP Authenticator)
     participant AAA as DN-AAA<br/>(FreeRADIUS)
 
-    Note over DEV: Punya EMSK_primary (64B) dari Phase A
-    Note over DEV,SRV: Pre-session: pertukaran static keys khusus service<br/>(PK_DEV_svc, PK_SRV_svc) — beda dari kunci primary
+    Note over DEV,AAA: INIT AND PRECONDITION
+    Note over DEV: Set variant and static credential (per varian)
+    Note over SRV: Set AAA endpoint, secret, and EDHOC_AAA_REQUIRE
+    Note over AAA: Set users for edhoc_<variant> in authorize file
 
-    DEV->>SRV: TCP connect
-    SRV->>DEV: EAP-Request / Start (Type=0xFE, S-flag, id=1)
+    DEV->>SRV: TCP Connect (dst port 19600)
+    Note over DEV: Set transport framing = 2-byte length + EAP packet
 
-    DEV->>SRV: EAP-Response / MSG1 (Type=0xFE, Code=2)
-    Note right of DEV: SUITES_I, G_X (eph), C_I,<br/>EAD_1 = ["binding", H(EMSK_p) ]
+    Note over SRV: EAP START
+    Note over SRV: Generate id_start as 1-byte identifier
+    Note over SRV: Set pkt_start = eap_build_packet(Code=1, Type=0xFE, Flags=S, id=id_start)
+    SRV->>DEV: EAP-Request/Start (Code=1, Type=0xFE, Flags=S, id=1)
 
-    SRV->>AAA: RADIUS Access-Request (probe binding)
-    Note right of SRV: User-Name = "edhoc_<Variant>@svc"<br/>State  = H(EMSK_p)<br/>Message-Authenticator
-    AAA-->>SRV: RADIUS Access-Challenge<br/>(boleh lanjut handshake)
+    Note over DEV: BUILD MSG1
+    Note over DEV: Parse Start and verify Code=Request and S flag
+    Note over DEV: Generate (x, X) = ecdhe.keygen()
+    Note over DEV: Set C_I = random connection identifier
+    Note over DEV: Set MSG1 = (SUITES_I, G_X, C_I)
+    Note over DEV: Compute len_msg1 and set L/M flags when len_msg1 exceeds MTU
+    DEV->>SRV: EAP-Response/MSG1 (Code=2, id=1, Type=0xFE)
 
-    SRV->>DEV: EAP-Request / MSG2
-    Note right of SRV: G_Y, C_R, CIPHERTEXT_2<br/>(berisi MAC_R atas TH_2 || EAD_1)
+    Note over SRV: PROCESS MSG1 AND BUILD MSG2
+    Note over SRV: Parse and reassemble MSG1 fragments if M flag is set
+    Note over SRV: Parse fields from MSG1 = (SUITES_I, G_X, C_I)
+    Note over SRV: Set selected_suite from SUITES_I
+    Note over SRV: Generate (y, Y) = ecdhe.keygen()
+    Note over SRV: Set C_R = random connection identifier
+    Note over SRV: Compute TH_2 = H(Y, MSG1, C_R)
+    Note over SRV: Compute G_XY = ecdhe(y, G_X)
+    Note over SRV: Compute PRK_2e = extract(G_XY, TH_2)
+    Note over SRV: Compute G_X_svc = ecdhe(SK_SRV_svc, G_X)
+    Note over SRV: Compute PRK_3e2m = extract(G_X_svc, PRK_2e)
+    Note over SRV: Compute MK_2 = expand(PRK_3e2m, TH_2, label_mk2)
+    Note over SRV: Compute MAC_2 = kdf(MK_2, C_R, ID_CRED_R, TH_2, PK_SRV_svc, EAD_2)
+    Note over SRV: Compute EK_2 = expand(PRK_2e, TH_2, label_ek2)
+    Note over SRV: Set PLAINTEXT_2 = (ID_CRED_R, MAC_2, EAD_2)
+    Note over SRV: Set CIPHERTEXT_2 = aead_enc(EK_2, TH_2, PLAINTEXT_2)
+    SRV->>DEV: EAP-Request/MSG2 (id=2, G_Y, CIPHERTEXT_2)
 
-    DEV->>SRV: EAP-Response / MSG3
-    Note right of DEV: CIPHERTEXT_3<br/>(berisi MAC_I atas TH_3)
+    Note over DEV: PROCESS MSG2 AND BUILD MSG3
+    Note over DEV: Compute G_XY = ecdhe(x, G_Y)
+    Note over DEV: Compute TH_2 = H(G_Y, MSG1, C_R)
+    Note over DEV: Compute PRK_2e = extract(G_XY, TH_2)
+    Note over DEV: Compute EK_2 = expand(PRK_2e, TH_2, label_ek2)
+    Note over DEV: Parse PLAINTEXT_2 = aead_dec(EK_2, TH_2, CIPHERTEXT_2)
+    Note over DEV: Parse fields from PLAINTEXT_2 = (ID_CRED_R, MAC_2, EAD_2)
+    Note over DEV: Set PK_SRV_svc from ID_CRED_R lookup
+    Note over DEV: Compute G_X_svc = ecdhe(x, PK_SRV_svc)
+    Note over DEV: Compute PRK_3e2m = extract(G_X_svc, PRK_2e)
+    Note over DEV: Compute MK_2 = expand(PRK_3e2m, TH_2, label_mk2)
+    Note over DEV: Verify MAC_2 using MK_2 and transcript fields
+    Note over DEV: Compute TH_3 = H(TH_2, PLAINTEXT_2, PK_SRV_svc)
+    Note over DEV: Compute G_Y_svc = ecdhe(SK_DEV_svc, G_Y)
+    Note over DEV: Compute PRK_4e3m = extract(G_Y_svc, PRK_3e2m)
+    Note over DEV: Compute MK_3 = expand(PRK_4e3m, TH_3, label_mk3)
+    Note over DEV: Compute MAC_3 = kdf(MK_3, ID_CRED_I, TH_3, PK_DEV_svc, EAD_3)
+    Note over DEV: Compute EK_3 = expand(PRK_3e2m, TH_3, label_ek3)
+    Note over DEV: Set PLAINTEXT_3 = (ID_CRED_I, MAC_3, EAD_3)
+    Note over DEV: Set CIPHERTEXT_3 = aead_enc(EK_3, TH_3, PLAINTEXT_3)
+    DEV->>SRV: EAP-Response/MSG3 (id=2, CIPHERTEXT_3)
 
-    opt Variant Type 3 PQ
-        SRV->>DEV: EAP-Request / MSG4
-        DEV->>SRV: EAP-Response / ACK
+    opt Type3_PQ_4msg
+        Note over SRV: PROCESS MSG3 AND BUILD MSG4
+        Note over SRV: Compute TH_3 = H(TH_2, PLAINTEXT_2, PK_SRV_svc)
+        Note over SRV: Compute EK_3 = expand(PRK_3e2m, TH_3, label_ek3)
+        Note over SRV: Parse PLAINTEXT_3 = aead_dec(EK_3, TH_3, CIPHERTEXT_3)
+        Note over SRV: Compute G_Y_svc = ecdhe(y, PK_DEV_svc)
+        Note over SRV: Compute PRK_4e3m = extract(G_Y_svc, PRK_3e2m)
+        Note over SRV: Compute MK_3 = expand(PRK_4e3m, TH_3, label_mk3)
+        Note over SRV: Verify MAC_3
+        Note over SRV: Compute TH_4 = H(TH_3, PLAINTEXT_3, PK_DEV_svc)
+        Note over SRV: Compute MK_4 = expand(PRK_4e3m, TH_4, label_mk4)
+        Note over SRV: Compute MAC_4 = kdf(MK_4, TH_4, EAD_4)
+        Note over SRV: Set CIPHERTEXT_4 = aead_enc(PRK_4e3m, TH_4, MAC_4)
+        SRV->>DEV: EAP-Request/MSG4 (id=3, CIPHERTEXT_4)
+        Note over DEV: Verify MAC_4 from CIPHERTEXT_4
+        DEV->>SRV: EAP-Response/ACK (id=3, empty)
     end
 
-    Note over DEV,SRV: PRK_out_secondary established
+    Note over DEV,SRV: SESSION KEY DERIVATION
+    Note over DEV,SRV: Compute PRK_out_s = expand(PRK_4e3m, TH_final)
+    Note over DEV,SRV: Compute MSK_s = EDHOC-Expand(PRK_out_s, label_msk, 64)
+    Note over DEV,SRV: Compute EMSK_s = EDHOC-Expand(PRK_out_s, label_emsk, 64)
+    Note over DEV,SRV: AppKey exporter OSCORE explicit belum diimplementasi di benchmark
 
+    Note over SRV: Send EAP-Success dulu dari handler varian
+    SRV->>DEV: EAP-Success (Code=3, Len=4)
+
+    Note over SRV,AAA: FINAL RADIUS AUTHORIZATION
+    Note over SRV: Set User-Name = edhoc_variant
+    Note over SRV: Set User-Password = edhoc-pass
+    Note over SRV: Set NAS-IP-Address = 127.0.0.1
+    Note over SRV: Set Service-Type = Framed-User
     SRV->>AAA: RADIUS Access-Request (final)
-    Note right of SRV: User-Name = "edhoc_<Variant>@svc"<br/>User-Password = service shared secret<br/>Class = MSK_s context id
-    AAA-->>SRV: RADIUS Access-Accept
 
-    SRV->>DEV: EAP-Success
+    alt Access-Accept
+        AAA-->>SRV: Access-Accept
+        Note over SRV: Set authorized = true
+    else Access-Reject
+        AAA-->>SRV: Access-Reject
+        Note over SRV: If EDHOC_AAA_REQUIRE=1 then stop benchmark loop
+        Note over SRV: Tidak ada EAP-Failure tambahan yang dikirim ke DEV
+    end
 
-    Note over DEV,SRV: Derive:<br/>MSK_s         = EDHOC-Expand(PRK_out_s, "EAP-EDHOC MSK", 13, 64)<br/>EMSK_s        = EDHOC-Expand(PRK_out_s, "EAP-EDHOC EMSK", 14, 64)<br/>App Key (OSCORE MS) = EDHOC-Exporter("OSCORE_Master_Secret", 16)
-
-    DEV->>SRV: Application data (OSCORE-protected)
+    Note over DEV,SRV: PROTECTED APPLICATION DATA
+    Note over DEV,SRV: Out-of-scope benchmark saat ini (tidak ada OSCORE data-path)
 ```
 
 ---
@@ -169,7 +217,7 @@ sequenceDiagram
 | EAP framing & MSK/EMSK derivation | ✅ Terimplementasi | [src/eap_layer.c](../src/eap_layer.c) — `eap_derive_msk_emsk()` |
 | Authenticator + AAA (RADIUS) | ✅ Terimplementasi (primary mode) | [src/benchmark_eap_responder_aaa.c](../src/benchmark_eap_responder_aaa.c) |
 | Two-phase (primary + secondary) split | ❌ Belum — saat ini hanya 1 phase | Perlu binary `eap_secondary_initiator` & `eap_secondary_responder` terpisah |
-| Channel binding via `EAD_1 = H(EMSK_p)` | ❌ Belum | Tambah `EAD_1` di `run_eap_<variant>_initiator()` ambil `EMSK_p` dari ENV / file |
+| Channel binding via `EAD_1 = H(EMSK_p)` | ❌ Belum | Belum ada di `src/eap_variant_*.c` saat ini |
 | Application Key (OSCORE MS) export | ❌ Belum | Panggil `edhoc_exporter("OSCORE_Master_Secret", 16, ...)` setelah handshake |
 | DN-AAA realm terpisah dari Operator AAA | ❌ Belum | Tambah realm `@svc` di FreeRADIUS proxy.conf |
 | Cross-AAA verification (binding lookup) | ❌ Belum | Custom RADIUS module / Perl unlang policy |
@@ -182,8 +230,8 @@ sequenceDiagram
 |---|---|---|
 | EAP method type 0xFE | draft-ietf-emu-eap-edhoc §3.1 | ✅ |
 | Secondary auth dalam PDU session | 3GPP TS 33.501 §11 (Annex U) | ✅ alur sesuai |
-| EAP-EDHOC channel binding via EAD | RFC 9528 §3.8 (EAD_1) | ✅ |
-| Application Key export | RFC 9528 §4.2 (`EDHOC-Exporter`) | ✅ |
+| EAP-EDHOC channel binding via EAD | RFC 9528 §3.8 (EAD_1) | ⚠️ Target design, belum diimplementasi |
+| Application Key export | RFC 9528 §4.2 (`EDHOC-Exporter`) | ⚠️ Target design, belum diimplementasi |
 | RADIUS Access-Request/Accept | RFC 2865 / RFC 3579 (EAP over RADIUS) | ✅ |
 
 ---
